@@ -83,6 +83,7 @@ module.exports = function(app) {
           '<form-builder-option property="style[\'margin-right\']"></form-builder-option>' +
           '<form-builder-option property="style[\'margin-bottom\']"></form-builder-option>' +
           '<form-builder-option property="style[\'margin-left\']"></form-builder-option>' +
+          '<form-builder-option property="style[\'width\']"></form-builder-option>' +
         '</ng-form>'
       );
 

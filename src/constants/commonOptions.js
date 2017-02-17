@@ -207,6 +207,11 @@ module.exports = {
     placeholder: '0px',
     tooltip: 'Sets the left margin of this component. Must be a valid CSS measurement like `10px`.'
   },
+  'style[\'width\']': {
+    label: 'Width',
+    placeholder: '0px',
+    tooltip: 'Sets the width of this component. Must be a valid CSS measurement like `10px`.'
+  },
   'addResource': {
     label: 'Show Add Resource Button',
     type: "checkbox",
