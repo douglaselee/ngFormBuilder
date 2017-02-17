@@ -206,5 +206,15 @@ module.exports = {
     label: 'Margin Left',
     placeholder: '0px',
     tooltip: 'Sets the left margin of this component. Must be a valid CSS measurement like `10px`.'
+  },
+  'runRulesOnLoad': {
+    label: 'Run rules when form loads',
+    type: "checkbox",
+    tooltip: 'Run rules when form loads'
+  },
+  'runRulesOnChange': {
+    label: 'Run rules when data changes',
+    type: "checkbox",
+    tooltip: 'Run rules when data changes'
   }
 };

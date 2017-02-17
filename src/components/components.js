@@ -16,18 +16,22 @@ module.exports = function(app) {
             '</div>' +
           '</div>' +
           '<div class="row">' +
-            '<div class="col-xs-6">' +
+            '<div class="col-xs-6" ng-class="tabSetClass">' +
               '<uib-tabset>' +
-                '<uib-tab ng-repeat="view in ::formComponent.views" heading="{{ ::view.name }}"><ng-include src="::view.template"></ng-include></uib-tab>' +
+                '<uib-tab ng-repeat="view in ::formComponent.views" heading="{{ ::view.name }}" select="onSelect()"><ng-include src="::view.template"></ng-include></uib-tab>' +
               '</uib-tabset>' +
             '</div>' +
-            '<div class="col-xs-6">' +
-              '<div class="panel panel-default preview-panel" style="margin-top:44px;">' +
+            '<div class="col-xs-6" ng-class="previewClass">' +
+              '<div class="panel panel-default preview-panel" style="margin-top:44px;" ng-show="showPreview">' +
                 '<div class="panel-heading">Preview</div>' +
                 '<div class="panel-body">' +
                   '<formio-component component="component" data="{}" formio="::formio"></formio-component>' +
                 '</div>' +
               '</div>' +
+
+              '<div style="margin-top:44px;" ng-hide="showPreview">' +
+              '</div>' +
+
               '<formio-settings-info component="component" data="{}" formio="::formio"></formio-settings-info>' +
               '<div class="form-group">' +
                 '<button type="submit" class="btn btn-success" ng-click="closeThisDialog(true)">Save</button>&nbsp;' +
@@ -85,6 +89,13 @@ module.exports = function(app) {
       // Create the common Layout tab markup.
       $templateCache.put('formio/components/common/conditional.html',
         '<form-builder-conditional></form-builder-conditional>'
+      );
+
+      // Create the common Rules markup.
+      $templateCache.put('formio/components/common/rules.html',
+        '<ng-form>' +
+        '<form-builder-option-rules></form-builder-option-rules>' +
+        '</ng-form>'
       );
     }
   ]);
