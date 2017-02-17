@@ -50,6 +50,7 @@
   "dependencies": {
     "angular": "^1.6.1",
     "angular-drag-and-drop-lists": "^1.4.0",
+    "angular-ui-ace": "^0.2.3",
     "angular-ui-bootstrap": "^2.5.0",
     "formio-utils": "^0.1.10",
     "lodash": "^4.17.4",

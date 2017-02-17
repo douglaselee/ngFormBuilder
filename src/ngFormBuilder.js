@@ -8,7 +8,8 @@ var app = angular.module('ngFormBuilder', [
   'dndLists',
   'ngDialog',
   'ui.bootstrap.accordion',
-  'ngCkeditor'
+  'ngCkeditor',
+  'ui.ace'
 ]);
 
 app.constant('FORM_OPTIONS', require('./constants/formOptions'));
@@ -42,6 +43,8 @@ app.directive('formBuilderOptionTags', require('./directives/formBuilderOptionTa
 app.directive('validApiKey', require('./directives/validApiKey'));
 
 app.directive('formBuilderOptionCustomValidation', require('./directives/formBuilderOptionCustomValidation'));
+
+app.directive('formBuilderOptionRules', require('./directives/formBuilderOptionRules'));
 
 app.directive('formBuilderTooltip', require('./directives/formBuilderTooltip'));
 

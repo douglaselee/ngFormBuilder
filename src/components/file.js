@@ -16,6 +16,10 @@ module.exports = function(app) {
                 name: key
               };
             });
+
+            // Suggest useful choices
+            $scope.component.storage = $scope.component.storage || 'url';
+            $scope.component.url     = $scope.component.url     || Formio.getBaseUrl() + '/api/files';
           }
         ],
         icon: 'fa fa-file',
@@ -39,6 +43,10 @@ module.exports = function(app) {
           {
             name: 'Conditional',
             template: 'formio/components/common/conditional.html'
+          },
+          {
+            name: 'Rules',
+            template: 'formio/components/common/rules.html'
           }
         ],
         documentation: 'http://help.form.io/userguide/#file'

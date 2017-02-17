@@ -216,5 +216,15 @@ module.exports = {
     label: 'Add Resource Text',
     placeholder: 'Add Resource',
     tooltip: 'Set the text of the Add Resource button.'
+  },
+  'runRulesOnLoad': {
+    label: 'Run rules when form loads',
+    type: "checkbox",
+    tooltip: 'Run rules when form loads'
+  },
+  'runRulesOnChange': {
+    label: 'Run rules when data changes',
+    type: "checkbox",
+    tooltip: 'Run rules when data changes'
   }
 };
