@@ -206,5 +206,10 @@ module.exports = {
     label: 'Margin Left',
     placeholder: '0px',
     tooltip: 'Sets the left margin of this component. Must be a valid CSS measurement like `10px`.'
+  },
+  'style[\'width\']': {
+    label: 'Width',
+    placeholder: '0px',
+    tooltip: 'Sets the width of this component. Must be a valid CSS measurement like `10px`.'
   }
 };
