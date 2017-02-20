@@ -224,12 +224,12 @@ module.exports = {
   },
   'runRulesOnLoad': {
     label: 'Run rules when form loads',
-    type: "checkbox",
+    type: 'checkbox',
     tooltip: 'Run rules when form loads'
   },
   'runRulesOnChange': {
     label: 'Run rules when data changes',
-    type: "checkbox",
+    type: 'checkbox',
     tooltip: 'Run rules when data changes'
   }
 };
