@@ -138,16 +138,18 @@ module.exports = [
         controller: ['$scope', 'Formio', '$controller', function($scope, Formio, $controller) {
           // Hide preview to make more room for rules code
           $scope.onSelect = function() {
-            $scope.showPreview  = this.view.name != 'Rules';
+            $scope.showPreview  = this.view.name !== 'Rules';
             $scope.tabSetClass  = $scope.showPreview ? 'col-xs-6' : 'col-xs-9';
             $scope.previewClass = $scope.showPreview ? 'col-xs-6' : 'col-xs-3';
           };
 
           // Set defaults for when to run rules
-          if (typeof $scope.component.runRulesOnLoad === 'undefined')
-            $scope.component.runRulesOnLoad = true;
-          if (typeof $scope.component.runRulesOnChange === 'undefined')
+          if (typeof $scope.component.runRulesOnLoad   === 'undefined') {
+            $scope.component.runRulesOnLoad   = true;
+          }
+          if (typeof $scope.component.runRulesOnChange === 'undefined') {
             $scope.component.runRulesOnChange = true;
+          }
 
           // Allow the component to add custom logic to the edit page.
           if (

@@ -7,24 +7,24 @@ module.exports = function() {
     replace: true,
     // Controller added for ace editor
     controller: ['$scope', function($scope) {
-      $scope.change = function () {
-      //console.log($scope.component.rules);
-      }
+      $scope.change = function() {
+        //console.log($scope.component.rules);
+      };
 
       $scope.aceOptions = {
-        useWrapMode : true,
+        useWrapMode: true,
         showGutter: true,
-        theme:'dawn',
+        theme: 'dawn',
         mode: 'javascript',
         showIndentGuides: true,
         showPrintMargin: false,
         onLoad: function(editor) {
           // Disable message: 'Automatically scrolling cursor into view after selection change this will be disabled in the next version set editor.$blockScrolling = Infinity to disable this message'
           editor.$blockScrolling = Infinity;
-        //editor.getSession().setMode('ace/mode/javascript');
-        //editor.setTheme('ace/theme/dawn');
+          //editor.getSession().setMode('ace/mode/javascript');
+          //editor.setTheme('ace/theme/dawn');
         }
-      }
+      };
     }],
     template: '' +
       '<div class="panel panel-default" id="accordion">' +

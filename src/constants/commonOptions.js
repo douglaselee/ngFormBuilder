@@ -207,14 +207,29 @@ module.exports = {
     placeholder: '0px',
     tooltip: 'Sets the left margin of this component. Must be a valid CSS measurement like `10px`.'
   },
+  'style[\'width\']': {
+    label: 'Width',
+    placeholder: '0px',
+    tooltip: 'Sets the width of this component. Must be a valid CSS measurement like `10px`.'
+  },
+  'addResource': {
+    label: 'Show Add Resource Button',
+    type: 'checkbox',
+    tooltip: 'Include a button for adding a new resource'
+  },
+  'addResourceLabel': {
+    label: 'Add Resource Text',
+    placeholder: 'Add Resource',
+    tooltip: 'Set the text of the Add Resource button.'
+  },
   'runRulesOnLoad': {
     label: 'Run rules when form loads',
-    type: "checkbox",
+    type: 'checkbox',
     tooltip: 'Run rules when form loads'
   },
   'runRulesOnChange': {
     label: 'Run rules when data changes',
-    type: "checkbox",
+    type: 'checkbox',
     tooltip: 'Run rules when data changes'
   }
 };
