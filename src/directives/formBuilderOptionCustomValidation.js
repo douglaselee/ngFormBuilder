@@ -12,7 +12,8 @@ module.exports = function() {
         '</div>' +
         '<div id="validationSection" class="panel-collapse collapse in">' +
           '<div class="panel-body">' +
-            '<textarea class="form-control" rows="5" id="custom" name="custom" ng-model="component.validate.custom" placeholder="/*** Example Code ***/\nvalid = (input === 3) ? true : \'Must be 3\';">{{ component.validate.custom }}</textarea>' +
+          //'<textarea class="form-control" rows="5" id="custom" name="custom" ng-model="component.validate.custom" placeholder="/*** Example Code ***/\nvalid = (input === 3) ? true : \'Must be 3\';">{{ component.validate.custom }}</textarea>' +
+            '<div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.validate.custom" style="height: 100px;"></div>' +
             '<small>' +
               '<p>Enter custom validation code.</p>' +
               '<p>You must assign the <strong>valid</strong> variable as either <strong>true</strong> or an error message if validation fails.</p>' +

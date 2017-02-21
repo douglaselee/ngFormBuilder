@@ -151,6 +151,33 @@ module.exports = [
             $scope.component.runRulesOnChange = true;
           }
 
+          $scope.aceChangeCustomDefault = function() {
+            /* eslint-disable */
+          //console.log($scope.component.customDefaultValue);
+            /* eslint-enable */
+          };
+
+          $scope.aceChangeCalculate = function() {
+            /* eslint-disable */
+          //console.log($scope.component.calculateValue);
+            /* eslint-enable */
+          };
+
+          $scope.aceOptions = {
+            useWrapMode: true,
+            showGutter: true,
+            theme: 'dawn',
+            mode: 'javascript',
+            showIndentGuides: true,
+            showPrintMargin: false,
+            onLoad: function(editor) {
+              // Disable message: 'Automatically scrolling cursor into view after selection change this will be disabled in the next version set editor.$blockScrolling = Infinity to disable this message'
+              editor.$blockScrolling = Infinity;
+              //editor.getSession().setMode('ace/mode/javascript');
+              //editor.setTheme('ace/theme/dawn');
+            }
+          };
+
           // Allow the component to add custom logic to the edit page.
           if (
             $scope.formComponent && $scope.formComponent.onEdit

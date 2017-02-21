@@ -22,7 +22,8 @@ module.exports = [
             '<input type="text" class="form-control input-md" ng-model="component.conditional.eq">' +
           '</div>' +
           '<div uib-accordion-group heading="Advanced" class="panel panel-default" is-open="status.advanced">' +
-            '<textarea class="form-control" rows="5" id="custom" name="custom" ng-model="component.customConditional" placeholder="/*** Example Code ***/\nshow = (data[\'mykey\'] > 1);"></textarea>' +
+          //'<textarea class="form-control" rows="5" id="custom" name="custom" ng-model="component.customConditional" placeholder="/*** Example Code ***/\nshow = (data[\'mykey\'] > 1);"></textarea>' +
+            '<div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.customConditional" style="height: 100px;"></div>' +
             '<small>' +
             '<p>Enter custom conditional code.</p>' +
             '<p>You must assign the <strong>show</strong> variable as either <strong>true</strong> or <strong>false</strong>.</p>' +
