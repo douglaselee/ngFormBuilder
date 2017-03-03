@@ -178,6 +178,8 @@ module.exports = [
             }
           };
 
+          $scope.editorVisible = true;
+
           // Allow the component to add custom logic to the edit page.
           if (
             $scope.formComponent && $scope.formComponent.onEdit
@@ -187,6 +189,17 @@ module.exports = [
 
           $scope.$watch('component.multiple', function(value) {
             $scope.data[$scope.component.key] = value ? [''] : '';
+          });
+
+          var editorDebounce = null;
+          $scope.$watchCollection('component.wysiwyg', function() {
+            $scope.editorVisible = false;
+            if (editorDebounce) {
+              clearTimeout(editorDebounce);
+            }
+            editorDebounce = setTimeout(function() {
+              $scope.editorVisible = true;
+            }, 200);
           });
 
           // Watch the settings label and auto set the key from it.
@@ -217,6 +230,13 @@ module.exports = [
           $scope.emit('edit', component);
         }
       });
+    };
+
+    // Clone form component
+    $scope.cloneComponent = function(component) {
+      $scope.formElement = angular.copy(component);
+      $scope.formElement.key = component.key + '' + $scope.form.components.length;
+      $scope.form.components.push($scope.formElement);
     };
 
     // Add to scope so it can be used in templates

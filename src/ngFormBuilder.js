@@ -8,7 +8,7 @@ var app = angular.module('ngFormBuilder', [
   'dndLists',
   'ngDialog',
   'ui.bootstrap.accordion',
-  'ngCkeditor',
+  'ckeditor',
   'ui.ace'
 ]);
 
