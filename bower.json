@@ -29,5 +29,8 @@
   },
   "devDependencies": {
     "font-awesome": "^4.6.3"
+  },
+  "resolutions": {
+    "angular-bootstrap": "^2.5.0"
   }
 }
