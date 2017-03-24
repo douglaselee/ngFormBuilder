@@ -1,6 +1,6 @@
 {
   "name": "ng-formio-builder",
-  "version": "2.13.1",
+  "version": "2.14.1",
   "description": "The Angular.js form builder component.",
   "main": "dist/ngFormBuilder.js",
   "scripts": {
@@ -54,7 +54,7 @@
     "angular-drag-and-drop-lists": "^2.1.0",
     "angular-ui-ace": "^0.2.3",
     "angular-ui-bootstrap": "^2.5.0",
-    "formio-utils": "^0.2.4",
+    "formiojs": "file:..\\formiojs",
     "lodash": "^4.17.4",
     "ng-dialog": "^0.6.6",
     "ng-formio": "file:..\\ng-formio",
