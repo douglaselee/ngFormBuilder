@@ -29,7 +29,8 @@ module.exports = function() {
     template: '' +
       '<div class="panel panel-default" id="accordion">' +
         '<div class="panel-heading" data-toggle="collapse" data-parent="#accordion" data-target="#rulesSection">' +
-          '<span class="panel-title">Rules</span>' +
+          '<span class="glyphicon glyphicon-warning-sign"></span><span class="panel-title"> Rules</span>' +
+          '<p>This Rules tab is going away!  Try using Calculated Value on the Data tab.  If they are not available for this type of component then ask Doug to add them.</p>' +
         '</div>' +
         '<div id="rulesSection" class="panel-collapse collapse in">' +
           '<div class="panel-body">' +
