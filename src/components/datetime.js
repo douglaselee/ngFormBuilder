@@ -18,6 +18,10 @@ module.exports = function(app) {
             var stdFormatDateTime = 'yyyy-MM-dd HH:mm';
             var stdFormatDate     = 'yyyy-MM-dd';
             var stdFormatTime     = 'HH:mm';
+            if ($scope.component.timePicker.showMeridian) {
+                stdFormatDateTime = 'yyyy-MM-dd hh:mm';
+                stdFormatTime     = 'hh:mm';
+            };
             var stdFormats        = [stdFormatDateTime, stdFormatDate, stdFormatTime];
 
             if ($scope.component.enableDate && $scope.component.enableTime && stdFormats.indexOf($scope.component.format) !== -1) {
