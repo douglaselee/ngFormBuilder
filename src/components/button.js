@@ -50,6 +50,10 @@ module.exports = function(app) {
           '  <label for="event" form-builder-tooltip="The event to fire when the button is clicked.">{{\'Button Event\' | formioTranslate}}</label>' +
           '  <input type="text" class="form-control" id="event" name="event" ng-model="component.event" placeholder="event" />' +
           '</div>' +
+          '<div class="form-group" ng-if="component.action === \'custom\'">' +
+          '  <label for="custom" form-builder-tooltip="The custom logic to evaluate when the button is clicked.">{{\'Button Custom Logic\' | formioTranslate}}</label>' +
+          '  <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.custom" style="height: 200px;"></div>' +
+          '</div>' +
           '<div class="form-group">' +
             '<label for="theme" form-builder-tooltip="The color theme of this panel.">{{\'Theme\' | formioTranslate}}</label>' +
             '<select class="form-control" id="theme" name="theme" ng-options="theme.name as theme.title for theme in themes" ng-model="component.theme"></select>' +
