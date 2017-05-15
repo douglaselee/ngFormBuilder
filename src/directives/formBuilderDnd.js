@@ -231,8 +231,21 @@ module.exports = [
             onLoad: function(editor) {
               // Disable message: 'Automatically scrolling cursor into view after selection change this will be disabled in the next version set editor.$blockScrolling = Infinity to disable this message'
               editor.$blockScrolling = Infinity;
-              //editor.getSession().setMode('ace/mode/javascript');
-              //editor.setTheme('ace/theme/dawn');
+              editor.setOptions({enableBasicAutocompletion: true});
+              editor.components = $scope.form.components;
+              /* eslint-disable no-undef*/
+              var tools = ace.require('ace/ext/language_tools');
+              /* eslint-enable  no-undef*/
+              if (tools.completed !== true) {
+                  tools.completed   = true;
+                  tools.addCompleter({
+                    getCompletions: function(editor, session, pos, prefix, callback) {
+                      callback(null, _.map(FormioUtils.flattenComponents(editor.components, true), function(comp) {
+                        return {name: comp.key, value: comp.key, score: 1000, meta: 'component'};
+                      }));
+                    }
+                  });
+              }
             }
           };
 
