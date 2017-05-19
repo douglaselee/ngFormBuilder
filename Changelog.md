@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [UNRELEASED]
 
+## 2.18.0
+### Fixed
+ - Custom components still didn't edit properly.
+ - Select url field missing due to passing ng-switch-when to field.
+ 
+### Changed
+ - Update ngFormio to 2.18.0
+
 ## 2.17.0
 ### Fixed
  - Custom component edits edit the right component.
