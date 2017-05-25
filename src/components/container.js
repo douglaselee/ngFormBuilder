@@ -8,7 +8,12 @@ module.exports = function(app) {
           {
             name: 'Display',
             template: 'formio/components/container/display.html'
-          }, {
+          },
+          {
+            name: 'Data',
+            template: 'formio/components/common/data.html'
+          },
+          {
             name: 'API',
             template: 'formio/components/common/api.html'
           },
