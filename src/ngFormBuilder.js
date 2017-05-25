@@ -91,8 +91,6 @@ app.directive('validApiKey', require('./directives/validApiKey'));
 
 app.directive('formBuilderOptionCustomValidation', require('./directives/formBuilderOptionCustomValidation'));
 
-app.directive('formBuilderOptionRules', require('./directives/formBuilderOptionRules'));
-
 app.directive('formBuilderTooltip', require('./directives/formBuilderTooltip'));
 
 app.directive('valueBuilder', require('./directives/valueBuilder'));

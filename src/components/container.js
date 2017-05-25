@@ -20,10 +20,6 @@ module.exports = function(app) {
           {
             name: 'Conditional',
             template: 'formio/components/common/conditional.html'
-          },
-          {
-            name: 'Rules',
-            template: 'formio/components/common/rules.html'
           }
         ],
         documentation: 'http://help.form.io/userguide/#container',

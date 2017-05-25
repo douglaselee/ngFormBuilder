@@ -16,13 +16,13 @@ module.exports = function(app) {
             '</div>' +
           '</div>' +
           '<div class="row">' +
-            '<div class="col-xs-6" ng-class="tabSetClass">' +
+            '<div class="col-xs-6">' +
               '<uib-tabset>' +
-                '<uib-tab ng-repeat="view in ::formComponent.views" heading="{{ ::view.name | formioTranslate }}" select="onSelect()"><ng-include src="::view.template"></ng-include></uib-tab>' +
+                '<uib-tab ng-repeat="view in ::formComponent.views" heading="{{ ::view.name | formioTranslate }}"><ng-include src="::view.template"></ng-include></uib-tab>' +
               '</uib-tabset>' +
             '</div>' +
-            '<div class="col-xs-6" ng-class="previewClass">' +
-              '<div class="panel panel-default preview-panel" style="margin-top:44px;" ng-show="showPreview">' +
+            '<div class="col-xs-6">' +
+              '<div class="panel panel-default preview-panel" style="margin-top:44px;">' +
                 '<div class="panel-heading">{{\'Preview\' | formioTranslate}}</div>' +
                 '<div class="panel-body">' +
                   '<div class="form-group" ng-if="component.wysiwyg && editorVisible">' +
@@ -32,10 +32,6 @@ module.exports = function(app) {
                   '<formio-component ng-if="!component.wysiwyg" component="component" data="{}" formio="::formio"></formio-component>' +
                 '</div>' +
               '</div>' +
-
-              '<div style="margin-top:44px;" ng-hide="showPreview">' +
-              '</div>' +
-
               '<formio-settings-info component="component" data="{}" formio="::formio"></formio-settings-info>' +
               '<div class="form-group">' +
                 '<button type="submit" class="btn btn-success" ng-click="closeThisDialog(true)">{{\'Save\' | formioTranslate}}</button>&nbsp;' +
@@ -120,13 +116,6 @@ module.exports = function(app) {
       // Create the common Layout tab markup.
       $templateCache.put('formio/components/common/conditional.html',
         '<form-builder-conditional></form-builder-conditional>'
-      );
-
-      // Create the common Rules markup.
-      $templateCache.put('formio/components/common/rules.html',
-        '<ng-form>' +
-        '<form-builder-option-rules></form-builder-option-rules>' +
-        '</ng-form>'
       );
     }
   ]);

@@ -29,10 +29,6 @@ module.exports = function(app) {
           {
             name: 'Conditional',
             template: 'formio/components/common/conditional.html'
-          },
-          {
-            name: 'Rules',
-            template: 'formio/components/common/rules.html'
           }
         ],
         onEdit: ['$scope', 'FormioUtils', function($scope, FormioUtils) {
