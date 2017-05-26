@@ -1,5 +1,9 @@
 <div class="row formbuilder">
   <div class="col-xs-4 col-sm-3 col-md-2 formcomponents" ng-if="form && form.display">
+    <div class="form-group">
+      <a class="btn btn-default" ng-click="$emit('cancel'); $event.stopPropagation();">Cancel</a>
+      <input type="submit" class="btn btn-primary" ng-click="$emit('saveForm'); $event.stopPropagation();" value="{{formId ? 'Save' : 'Create'}} {{ capitalize(form.type) }}" />
+    </div>
     <uib-accordion close-others="true" ng-if="form.display !== 'pdf'">
       <div uib-accordion-group ng-repeat="(groupName, group) in formComponentGroups" heading="{{ group.title }}" is-open="$first" class="panel panel-default form-builder-panel {{ group.panelClass }}">
         <uib-accordion close-others="true" ng-if="group.subgroups">

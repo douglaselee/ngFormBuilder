@@ -166,6 +166,8 @@ module.exports = ['debounce', function(debounce) {
           setNumPages();
         });
 
+        $scope.formId = $scope.$parent.formId;
+
         $scope.formComponents = _cloneDeep(formioComponents.components);
         _each($scope.formComponents, function(component, key) {
           component.settings.isNew = true;
