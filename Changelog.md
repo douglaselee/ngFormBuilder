@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
-## [Unreleased]
+## [UNRELEASED]
+
+## 2.19.3
+### Added
+ - Add tableView config to layout components.
 
 ## 2.19.2
 ### Fixed
