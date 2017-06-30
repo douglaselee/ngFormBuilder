@@ -52,7 +52,7 @@ module.exports = function(app) {
           '</div>' +
           '<div class="form-group" ng-if="component.action === \'custom\'">' +
           '  <label for="custom" form-builder-tooltip="The custom logic to evaluate when the button is clicked.">{{\'Button Custom Logic\' | formioTranslate}}</label>' +
-          '  <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.custom" style="height: 200px;"></div>' +
+          '  <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.custom" style="height: 200px;" placeholder="/*** Example Code ***/\ndata[\'mykey\'] = data[\'anotherKey\'];"></div>' +
           '</div>' +
           '<div class="form-group">' +
             '<label for="theme" form-builder-tooltip="The color theme of this panel.">{{\'Theme\' | formioTranslate}}</label>' +

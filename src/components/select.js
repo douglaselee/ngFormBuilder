@@ -211,7 +211,7 @@ module.exports = function(app) {
           '<div class="form-group" ng-show="component.dataSrc == \'custom\'">' +
           '  <label for="custom" form-builder-tooltip="Write custom code to return the value options. The form data object is available.">Custom Values</label>' +
         //'  <textarea class="form-control" rows="10" id="custom" name="custom" ng-model="component.data.custom" placeholder="/*** Example Code ***/\nvalues = data[\'mykey\'];">{{ component.data.custom }}</textarea>' +
-          '  <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.data.custom" style="height: 200px;"></div>' +
+          '  <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.data.custom" style="height: 200px;" placeholder="/*** Example Code ***/\nvalues = data[\'mykey\'];"></div>' +
           '</div>' +
           '<div class="form-group">' +
             '<label for="placeholder" form-builder-tooltip="The HTML template for the result data items.">Item Template</label>' +

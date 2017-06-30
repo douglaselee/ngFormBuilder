@@ -51,7 +51,7 @@ module.exports = function(app) {
         '    <uib-accordion>' +
         '      <div uib-accordion-group heading="JavaScript Default" class="panel panel-default" is-open="true">' +
       //'        <textarea class="form-control" rows="5" id="customDefaultValue" name="customDefaultValue" ng-model="component.customDefaultValue" placeholder="/*** Example Code ***/\nvalue = data[\'mykey\'] + data[\'anotherKey\'];"></textarea>' +
-        '        <div ui-ace="aceOptions" id="customDefaultValue" name="customDefaultValue" ng-model="component.customDefaultValue" ng-change="aceChangeCustomDefault()" style="height: 200px;"></div>' +
+        '        <div ui-ace="aceOptions" id="customDefaultValue" name="customDefaultValue" ng-model="component.customDefaultValue" ng-change="aceChangeCustomDefault()" style="height: 200px;" placeholder="/*** Example Code ***/\nvalue = data[\'mykey\'] + data[\'anotherKey\'];"></div>' +
         '        <small>' +
         '          <p>Enter custom default value code.</p>' +
         '          <p>You must assign the <strong>value</strong> variable as the result you want for the default value.</p>' +
@@ -73,7 +73,7 @@ module.exports = function(app) {
         '    <uib-accordion>' +
         '      <div uib-accordion-group heading="JavaScript Value" class="panel panel-default" is-open="true">' +
       //'        <textarea class="form-control" rows="5" id="calculateValue" name="calculateValue" ng-model="component.calculateValue" placeholder="/*** Example Code ***/\nvalue = data[\'mykey\'] + data[\'anotherKey\'];"></textarea>' +
-        '        <div ui-ace="aceOptions" id="calculateValue" name="calculateValue" ng-model="component.calculateValue" ng-change="aceChangeCalculate()" style="height: 200px;"></div>' +
+        '        <div ui-ace="aceOptions" id="calculateValue" name="calculateValue" ng-model="component.calculateValue" ng-change="aceChangeCalculate()" style="height: 200px;" placeholder="/*** Example Code ***/\nvalue = data[\'mykey\'] + data[\'anotherKey\'];"></div>' +
         '        <small>' +
         '          <p>Enter code to calculate a value.</p>' +
         '          <p>You must assign the <strong>value</strong> variable as the result you want for the default value.</p>' +

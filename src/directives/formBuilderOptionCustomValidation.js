@@ -10,7 +10,7 @@ module.exports = function() {
       '<uib-accordion>' +
       '  <div uib-accordion-group heading="Custom Validation" class="panel panel-default">' +
     //'    <textarea class="form-control" rows="5" id="custom" name="custom" ng-model="component.validate.custom" placeholder="/*** Example Code ***/\nvalid = (input === 3) ? true : \'Must be 3\';">{{ component.validate.custom }}</textarea>' +
-      '    <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.validate.custom" style="height: 100px;"></div>' +
+      '    <div ui-ace="aceOptions" id="custom" name="custom" ng-model="component.validate.custom" style="height: 100px;" placeholder="/*** Example Code ***/\nvalid = (input === 3) ? true : \'Must be 3\';"></div>' +
       '    <small>' +
       '      <p>Enter custom validation code.</p>' +
       '      <p>You must assign the <strong>valid</strong> variable as either <strong>true</strong> or an error message if validation fails.</p>' +
