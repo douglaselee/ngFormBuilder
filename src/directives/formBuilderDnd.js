@@ -195,63 +195,6 @@ module.exports = [
         scope: childScope,
         className: 'ngdialog-theme-default component-settings',
         controller: ['$scope', 'Formio', '$controller', function($scope, Formio, $controller) {
-          $scope.aceChangeCustomDefault = function() {
-            /* eslint-disable */
-          //console.log($scope.component.customDefaultValue);
-            /* eslint-enable */
-          };
-
-          $scope.aceChangeCalculate = function() {
-            /* eslint-disable */
-          //console.log($scope.component.calculateValue);
-            /* eslint-enable */
-          };
-
-          $scope.aceOptions = {
-            useWrapMode: true,
-            showGutter: true,
-            theme: 'dawn',
-            mode: 'javascript',
-            showIndentGuides: true,
-            showPrintMargin: false,
-            onLoad: function(editor) {
-              // Disable message: 'Automatically scrolling cursor into view after selection change this will be disabled in the next version set editor.$blockScrolling = Infinity to disable this message'
-              editor.$blockScrolling = Infinity;
-              editor.setOptions({enableBasicAutocompletion: true});
-              editor.components = $scope.form.components;
-              /* eslint-disable no-undef*/
-              var tools = ace.require('ace/ext/language_tools');
-              /* eslint-enable  no-undef*/
-              if (tools.completed !== true) {
-                  tools.completed   = true;
-                  tools.addCompleter({
-                    getCompletions: function(editor, session, pos, prefix, callback) {
-                      callback(null, _.map(FormioUtils.flattenComponents(editor.components, true), function(comp) {
-                        return {name: comp.key, value: comp.key, score: 1000, meta: 'component'};
-                      }));
-                    }
-                  });
-              }
-              function update() {
-                  var shouldShow = !editor.session.getValue().length;
-                  var node = editor.renderer.emptyMessageNode;
-                  if (!shouldShow && node) {
-                      editor.renderer.scroller.removeChild(editor.renderer.emptyMessageNode);
-                      editor.renderer.emptyMessageNode = null;
-                  }
-                  else if (shouldShow && !node) {
-                      node = editor.renderer.emptyMessageNode = document.createElement('div');
-                      node.innerHTML = editor.container.attributes['placeholder'].value.replace('\n', '<br>');
-                      node.className = 'ace_invisible ace_emptyMessage';
-                      node.style.padding = '0 9px';
-                      editor.renderer.scroller.appendChild(node);
-                  }
-              }
-              editor.on('input', update);
-              setTimeout(update, 100);
-            }
-          };
-
           $scope.editorVisible = true;
 
           // Allow the component to add custom logic to the edit page.
