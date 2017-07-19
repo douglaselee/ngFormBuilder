@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## 2.20.11
+### Fixed
+ - Logic for resoureFilter
+
+## 2.20.10
+### Fixed
+ - Fixed crash if component doesn't have tags.
+
+## 2.20.9
+### Fixed
+ - Don't prefix existing fields when dragging between containers. This breaks data.
+
 ## 2.20.8
 ### Fixed
  - Builder lowercasing all auto keys.
