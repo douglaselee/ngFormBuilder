@@ -36,7 +36,7 @@ module.exports = function(app) {
   ]);
   app.controller('wysiwygSettings', ['$scope', function($scope) {
     $scope.wysiwygEnabled = !!$scope.component.wysiwyg;
-    $scope.wysiwygSettings = {
+    $scope.wysiwygSettings = $scope.wysiwygEnabled && typeof($scope.component.wysiwyg) == "object" ? $scope.component.wysiwyg: {
       toolbarGroups:  [
         {name: 'basicstyles', groups: ['basicstyles', 'cleanup']},
         {name: 'paragraph', groups: ['list', 'indent', 'blocks', 'align', 'bidi', 'paragraph', '-', 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock']},
@@ -75,6 +75,7 @@ module.exports = function(app) {
           '<form-builder-option property="label"></form-builder-option>' +
           '<form-builder-option property="placeholder"></form-builder-option>' +
           '<form-builder-option property="description"></form-builder-option>' +
+          '<form-builder-option property="errorLabel"></form-builder-option>' +
           '<form-builder-option property="inputMask"></form-builder-option>' +
           '<div ng-controller="wysiwygSettings">' +
             '<div class="checkbox">' +
