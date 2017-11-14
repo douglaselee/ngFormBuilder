@@ -47,6 +47,7 @@ module.exports = function(app) {
       $templateCache.put('formio/components/resource/display.html',
         '<ng-form>' +
           '<form-builder-option property="label"></form-builder-option>' +
+          '<form-builder-option-label-position></form-builder-option-label-position>' +
           '<form-builder-option property="placeholder"></form-builder-option>' +
           '<form-builder-option property="tooltip"></form-builder-option>' +
           '<div class="form-group">' +
@@ -87,6 +88,7 @@ module.exports = function(app) {
       $templateCache.put('formio/components/resource/validate.html',
         '<ng-form>' +
           '<form-builder-option property="validate.required"></form-builder-option>' +
+          '<form-builder-option property="validate.customMessage"></form-builder-option>' +
         '</ng-form>'
       );
     }

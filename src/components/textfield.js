@@ -40,6 +40,7 @@ module.exports = function(app) {
       $templateCache.put('formio/components/textfield/display.html',
         '<ng-form>' +
           '<form-builder-option property="label"></form-builder-option>' +
+          '<form-builder-option-label-position></form-builder-option-label-position>' +
           '<form-builder-option property="placeholder"></form-builder-option>' +
           '<form-builder-option property="description"></form-builder-option>' +
           '<form-builder-option property="tooltip"></form-builder-option>' +
@@ -69,6 +70,7 @@ module.exports = function(app) {
           '<form-builder-option property="validate.minLength"></form-builder-option>' +
           '<form-builder-option property="validate.maxLength"></form-builder-option>' +
           '<form-builder-option property="validate.pattern"></form-builder-option>' +
+          '<form-builder-option property="validate.customMessage"></form-builder-option>' +
           '<form-builder-option-custom-validation></form-builder-option-custom-validation>' +
         '</ng-form>'
       );
