@@ -246,7 +246,7 @@ module.exports = ['debounce', function(debounce) {
             subgroups: {}
           };
 
-          var query = {params: {type: 'resource', limit: 100}};
+          var query = {params: {type: 'resource', limit: 100, tags__ne: 'hidden'}};
           if ($scope.options && $scope.options.resourceFilter) {
             query.params.tags = $scope.options.resourceFilter;
           }
