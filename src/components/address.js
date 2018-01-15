@@ -26,7 +26,7 @@ module.exports = function(app) {
             template: 'formio/components/common/conditional.html'
           }
         ],
-        documentation: 'http://help.form.io/userguide/#address'
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components'
       });
     }
   ]);
@@ -39,7 +39,6 @@ module.exports = function(app) {
           '<form-builder-option property="label"></form-builder-option>' +
           '<form-builder-option-label-position></form-builder-option-label-position>' +
           '<form-builder-option property="placeholder"></form-builder-option>' +
-          '<form-builder-option property="tooltip"></form-builder-option>' +
           '<form-builder-option property="customClass"></form-builder-option>' +
           '<form-builder-option property="tooltip"></form-builder-option>' +
           '<form-builder-option property="errorLabel"></form-builder-option>' +

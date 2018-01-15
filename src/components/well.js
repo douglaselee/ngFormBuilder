@@ -5,7 +5,7 @@ module.exports = function(app) {
       formioComponentsProvider.register('well', {
         fbtemplate: 'formio/formbuilder/well.html',
         icon: 'fa fa-square-o',
-        documentation: 'http://help.form.io/userguide/#well',
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components',
         noDndOverlay: true,
         confirmRemove: true,
         views: [

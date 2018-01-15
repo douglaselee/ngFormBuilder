@@ -23,7 +23,7 @@ module.exports = function(app) {
             template: 'formio/components/common/conditional.html'
           }
         ],
-        documentation: 'http://help.form.io/userguide/#datagrid',
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components',
         noDndOverlay: true,
         confirmRemove: true
       });

@@ -13,7 +13,7 @@ module.exports = function(app) {
       formioComponentsProvider.register('email', {
         icon: 'fa fa-at',
         views: views,
-        documentation: 'http://help.form.io/userguide/#email'
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components'
       });
     }
   ]);

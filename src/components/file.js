@@ -46,7 +46,7 @@ module.exports = function(app) {
             template: 'formio/components/common/conditional.html'
           }
         ],
-        documentation: 'http://help.form.io/userguide/#file'
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components'
       });
     }
   ]);

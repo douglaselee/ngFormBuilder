@@ -4,7 +4,7 @@ module.exports = function(app) {
     function(formioComponentsProvider) {
       formioComponentsProvider.register('table', {
         fbtemplate: 'formio/formbuilder/table.html',
-        documentation: 'http://help.form.io/userguide/#table',
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components',
         noDndOverlay: true,
         confirmRemove: true,
         icon: 'fa fa-table',

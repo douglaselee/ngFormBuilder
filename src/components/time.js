@@ -14,7 +14,7 @@ module.exports = function(app) {
       formioComponentsProvider.register('time', {
         icon: 'fa fa-clock-o',
         views: views,
-        documentation: 'http://help.form.io/userguide/#time'
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components'
       });
     }
   ]);

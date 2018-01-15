@@ -13,7 +13,7 @@ module.exports = function(app) {
         }],
         fbtemplate: 'formio/formbuilder/columns.html',
         icon: 'fa fa-columns',
-        documentation: 'http://help.form.io/userguide/#columns',
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components',
         noDndOverlay: true,
         confirmRemove: true,
         views: [

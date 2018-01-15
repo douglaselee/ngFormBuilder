@@ -5,7 +5,7 @@ module.exports = function(app) {
       formioComponentsProvider.register('content', {
         fbtemplate: 'formio/formbuilder/content.html',
         icon: 'fa fa-html5',
-        documentation: 'http://help.form.io/userguide/#content-component',
+        documentation: 'http://knowledge.square-9.com:8090/display/GF10/Understanding+Components',
         controller: function(settings, $scope) {
           $scope.ckeditorOptions = {
             allowedContent: true,
