@@ -316,13 +316,17 @@ module.exports = ['debounce', function(debounce) {
         var rootlistEL = angular.element('.rootlist');
         var formbuilderEL = angular.element('.formbuilder');
 
-        $interval(function setRootListHeight() {
+        $scope.interval = $interval(function setRootListHeight() {
           var listHeight = rootlistEL.height('inherit').height();
           var builderHeight = formbuilderEL.height();
           if ((builderHeight - listHeight) > 100) {
             rootlistEL.height(builderHeight);
           }
         }, 1000);
+
+        $scope.$on('$destroy', function () {
+          $interval.cancel($scope.interval);
+        });
 
         // Add to scope so it can be used in templates
         $scope.dndDragIframeWorkaround = dndDragIframeWorkaround;
