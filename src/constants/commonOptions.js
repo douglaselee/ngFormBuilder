@@ -86,6 +86,11 @@ module.exports = {
     type: 'checkbox',
     tooltip: 'Disable the form input.'
   },
+  dbIndex: {
+    label: 'Database Index',
+    type: 'checkbox',
+    tooltip: 'Set this field as an index within the database. Increases performance for submission queries.'
+  },
   clearOnRefresh: {
     label: 'Clear Value On Refresh',
     type: 'checkbox',
@@ -328,5 +333,9 @@ module.exports = {
     label: 'Add Resource Text',
     placeholder: 'Add Resource',
     tooltip: 'Set the text of the Add Resource button.'
+  },
+  'useLocaleSettings': {
+    label: 'Use Locale Settings',
+    type: 'checkbox',
   }
 };

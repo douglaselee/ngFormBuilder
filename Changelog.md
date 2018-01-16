@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.27.1
+### Fixed
+ - Options to accept single-way binding.
+
+## 2.27.0
+### Added
+ - Data grid "Add Another" positions.
+ - Default labels.
+ - Ability to wrap checkboxes in fieldsets.
+ - Added label setting for HTML component
+
+### Changed
+ - Upgraded ng-formio to 2.27.x
+ - Allow nested forms to set clear on hide.
+
+## 2.26.3
+### Fixed
+ - Removed all limits to form queries.
+
+## 2.26.2
+### Fixed
+ - ObjectBuilder directive.
+
+### Added
+ - 'useLocaleSettings' option to Day and DateTime components.
+ - Label setting for HTML element component
+
+## 2.26.1
+### Changed
+ - Increased the limit of the forms pulling for nested forms.
+ - Upgrade ng-formio to 2.26.4
+
+## 2.26.0
+### Changed
+ - Upgrade ng-formio to 2.26.0
+
+## 2.25.7
+### Added
+ - Controls for field indexes.
+
+### Changed
+ - Upgrade ng-formio to 2.25.7
+
 ## 2.25.6
 ### Changed
  - Upgraded ng-formio to latest version.
@@ -33,7 +76,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  - Possibility to add custom validation message.
  - Possibility to add shortcuts.
  - Min and Max size for file uploads.
- 
+
 ### Changed
  - Upgrade ng-formio to 2.25.0
 
@@ -65,7 +108,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 2.23.8
 ### Added
  - Added translation support for many of the strings in builder.
- 
+
 ### Changed
  - Upgraded ng-formio to 2.23.8
 
@@ -80,10 +123,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 2.23.6
 ### Added
  - Rows configuration for text areas.
- 
+
 ### Fixed
  - Issue where blank input was showing up on textfield edit.
- 
+
 ### Changed
  - Upgraded ng-formio to 2.23.6
 
@@ -173,7 +216,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 2.20.5
 ### Changed
  - Upgraded ng-formio to 2.20.5
-  
+
 ### Fixed
  - Template reset for Select component.
  - Columns hiding if width not set.
@@ -216,7 +259,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 2.19.1
 ### Added
  - Added 'disable limiting response' option for select component with url as datasource.
- 
+
 ## 2.19.0
 ### Added
  - Form component to the form builder.
@@ -233,7 +276,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 2.18.2
 ### Added
  - Add headers option to Select Urls.
- 
+
 ### Changed
  - Upgrade ngFormio to 2.18.5
 
@@ -251,7 +294,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
  - Custom components still didn't edit properly.
  - Select url field missing due to passing ng-switch-when to field.
- 
+
 ### Changed
  - Update ngFormio to 2.18.0
 
@@ -265,7 +308,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
  - Removing random validation field on the file component, which was not used.
- 
+
 ### Changed
  - Update ngFormio to 2.17.0
 
@@ -298,7 +341,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  - The event that should be fired to iframe builder when a component is updated with modal.
 
 ## 2.16.0
-### Added 
+### Added
  - Added the UI for the "Add Resource" functionality.
  - Added support for iframe builders (like the PDF builder)
  - Adding ability to set a Checkbox to be of type Radio.

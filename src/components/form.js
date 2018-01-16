@@ -27,7 +27,7 @@ module.exports = function(app) {
         onEdit: ['$scope', function($scope) {
           $scope.forms = [];
           $scope.component.project = $scope.formio.projectId;
-          $scope.formio.loadForms({params: {limit: 100}}).then(function(forms) {
+          $scope.formio.loadForms({params: {limit: 4294967295}}).then(function(forms) {
             var data = [];
             if ($scope.form._id) {
               angular.forEach(forms, function(form) {
@@ -64,7 +64,7 @@ module.exports = function(app) {
 
           var forms = {};
           $scope.form = {title: 'Unknown form'};
-          $scope.formio.loadForms({params: {limit: 100}}).then(function(formioForms) {
+          $scope.formio.loadForms({params: {limit: 4294967295}}).then(function(formioForms) {
             angular.forEach(formioForms, function(form) {
               forms[form._id] = form;
             });
@@ -104,6 +104,7 @@ module.exports = function(app) {
           '</div>' +
           '<form-builder-option property="customClass"></form-builder-option>' +
           '<form-builder-option property="reference"></form-builder-option>' +
+          '<form-builder-option property="clearOnHide"></form-builder-option>' +
           '<form-builder-option property="protected"></form-builder-option>' +
           '<form-builder-option property="persistent"></form-builder-option>' +
           '<form-builder-option property="encrypted" class="form-builder-premium"></form-builder-option>' +
