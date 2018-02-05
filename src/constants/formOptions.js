@@ -49,6 +49,10 @@ module.exports = {
     {
       name: 'warning',
       title: 'Warning'
+    },
+    {
+      name: 'link',
+      title: 'Link'
     }
   ],
   sizes: [
