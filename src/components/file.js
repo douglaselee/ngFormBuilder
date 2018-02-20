@@ -13,7 +13,7 @@ module.exports = function(app) {
             // Pull out title and name from the list of storage plugins.
             $scope.storage = _map(Formio.providers.storage, function(storage, key) {
               return {
-                title: storage.default.title,
+                title: storage.title,
                 name: key
               };
             });
