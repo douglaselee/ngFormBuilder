@@ -246,7 +246,12 @@ module.exports = ['debounce', function(debounce) {
             subgroups: {}
           };
 
-          var query = {params: {type: 'resource', limit: 4294967295, tags__ne: 'hidden'}};
+          var query = {params: {
+            type: 'resource',
+            limit: 4294967295,
+            tags__ne: 'hidden',
+            select: '_id,title,name,components'
+          }};
           if ($scope.options && $scope.options.resourceFilter) {
             query.params.tags = $scope.options.resourceFilter;
           }

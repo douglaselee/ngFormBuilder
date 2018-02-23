@@ -29973,7 +29973,7 @@ module.exports = function(app) {
               '</div>' +
               '<formio-settings-info component="component" data="{}" formio="::formio"></formio-settings-info>' +
               '<div class="form-group">' +
-                '<button type="submit" class="btn btn-success" ng-if="component.input" ng-disabled="!component.label" ng-click="closeThisDialog(true)">{{\'Save\' | formioTranslate}}</button>&nbsp;' +
+                '<button type="submit" class="btn btn-success" ng-if="component.input" ng-click="closeThisDialog(true)">{{\'Save\' | formioTranslate}}</button>&nbsp;' +
         '<button type="submit" class="btn btn-success" ng-if="!component.input" ng-click="closeThisDialog(true)">{{\'Save\' | formioTranslate}}</button>&nbsp;' +
                 '<button type="button" class="btn btn-default" ng-click="closeThisDialog(false)" ng-if="!component.isNew">{{\'Cancel\' | formioTranslate}}</button>&nbsp;' +
                 '<button type="button" class="btn btn-danger" ng-click="removeComponent(component, formComponents[component.type].confirmRemove); closeThisDialog(false)">{{\'Remove\' | formioTranslate}}</button>' +
@@ -31065,7 +31065,10 @@ module.exports = function(app) {
         onEdit: ['$scope', function($scope) {
           $scope.forms = [];
           $scope.component.project = $scope.formio.projectId;
-          $scope.formio.loadForms({params: {limit: 4294967295}}).then(function(forms) {
+          $scope.formio.loadForms({params: {
+            limit: 4294967295,
+            select: '_id,title,type'
+          }}).then(function(forms) {
             var data = [];
             if ($scope.form._id) {
               angular.forEach(forms, function(form) {
@@ -31102,7 +31105,10 @@ module.exports = function(app) {
 
           var forms = {};
           $scope.form = {title: 'Unknown form'};
-          $scope.formio.loadForms({params: {limit: 4294967295}}).then(function(formioForms) {
+          $scope.formio.loadForms({params: {
+            limit: 4294967295,
+            select: '_id,title,type'
+          }}).then(function(formioForms) {
             angular.forEach(formioForms, function(form) {
               forms[form._id] = form;
             });
@@ -31781,7 +31787,11 @@ module.exports = function(app) {
         onEdit: ['$scope', function($scope) {
           $scope.resources = [];
           $scope.component.project = $scope.formio.projectId;
-          $scope.formio.loadForms({params: {type: 'resource', limit: 4294967295}}).then(function(resources) {
+          $scope.formio.loadForms({params: {
+            type: 'resource',
+            limit: 4294967295,
+            select: '_id,title'
+          }}).then(function(resources) {
             $scope.resources = resources;
             if (!$scope.component.resource) {
               $scope.component.resource = resources[0]._id;
@@ -31981,7 +31991,11 @@ module.exports = function(app) {
             }
 
             if (($scope.resources.length === 0) && (source === 'resource')) {
-              $scope.formio.loadForms({params: {type: 'resource', limit: 4294967295}}).then(function(resources) {
+              $scope.formio.loadForms({params: {
+                type: 'resource',
+                limit: 4294967295,
+                select: '_id,title,components'
+              }}).then(function(resources) {
                 $scope.resources = resources;
                 loadFields();
               });
@@ -33438,7 +33452,11 @@ module.exports = ['debounce', function(debounce) {
             subgroups: {}
           };
 
-          var query = {params: {type: 'resource', limit: 4294967295}};
+          var query = {params: {
+            type: 'resource',
+            limit: 4294967295,
+            select: '_id,title,name,components'
+          }};
           if ($scope.options && $scope.options.resourceFilter) {
             query.params.tags = $scope.options.resourceFilter;
           }
@@ -33978,12 +33996,6 @@ module.exports = [
               BuilderUtils.uniquify($scope.form, $scope.component);
               $scope.data[$scope.component.key] = $scope.component.multiple ? [''] : '';
             }
-
-            // If there is no component label, then set it to the key and set hide label to ensure reverse compatibility.
-            if (!$scope.component.label) {
-              $scope.component.label = $scope.component.key || $scope.component.type;
-              $scope.component.hideLabel = true;
-            }
           });
         }]
       }).closePromise.then(function(e) {
@@ -33996,6 +34008,12 @@ module.exports = [
           // Revert to old settings, but use the same object reference
           _assign(component, previousSettings);
           return;
+        }
+
+        // If there is no component label, then set it to the key and set hide label to ensure reverse compatibility.
+        if (!component.label) {
+          component.label = component.key || component.type;
+          component.hideLabel = true;
         }
 
         FormioUtils.eachComponent([component], function(child) {
@@ -34178,10 +34196,20 @@ module.exports = ['COMMON_OPTIONS', '$filter', function(COMMON_OPTIONS, $filter)
               '</div>';
       }
 
+      var helpMessage = '';
+      switch (property) {
+        case 'label':
+          helpMessage = '<span class="help-block" ng-if="!component.label">You must provide a label for this component.</span>';
+          break;
+        default:
+          break;
+      }
+
       input.addClass('form-control');
       return '<div class="form-group">' +
                 '<label class="control-label" for="' + property + '" form-builder-tooltip="' + formioTranslate(tooltip) + '">' + formioTranslate(label) + '</label><div class="input-group">' +
                 input.prop('outerHTML') +
+                helpMessage +
               '</div></div>';
     }
   };
@@ -34715,11 +34743,11 @@ module.exports = function () {
 
       scope.$watch('component.label', function () {
         if(ctrl.$invalid) {
-          element[0].parentNode.classList.add('has-error');
+          element[0].parentNode.classList.add('has-warning');
           ctrl.$validate();
         }
         else {
-          element[0].parentNode.classList.remove('has-error');
+          element[0].parentNode.classList.remove('has-warning');
           ctrl.$validate();
         }
       }, true);
@@ -35273,7 +35301,7 @@ module.exports = ['$timeout','$q', function($timeout, $q) {
 
 },{}],295:[function(_dereq_,module,exports){
 "use strict";
-/*! ng-formio-builder v2.28.3 | https://unpkg.com/ng-formio-builder@2.28.3/LICENSE.txt */
+/*! ng-formio-builder v2.28.5 | https://unpkg.com/ng-formio-builder@2.28.5/LICENSE.txt */
 /*global window: false, console: false, jQuery: false */
 /*jshint browser: true */
 

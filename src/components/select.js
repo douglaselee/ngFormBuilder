@@ -106,7 +106,12 @@ module.exports = function(app) {
             }
 
             if (($scope.resources.length === 0) && (source === 'resource')) {
-              $scope.formio.loadForms({params: {type: 'resource', limit: 4294967295, tags__ne: 'hidden'}}).then(function(resources) {
+              $scope.formio.loadForms({params: {
+                type: 'resource',
+                limit: 4294967295,
+                tags__ne: 'hidden',
+                select: '_id,title,components'
+              }}).then(function(resources) {
                 $scope.resources = resources;
                 loadFields();
               });
