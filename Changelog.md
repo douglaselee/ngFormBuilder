@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.32.0
+### Changed
+ - Upgrade renderer dependency.
+
+### Fixed
+- Autofocus option.
+
+### Added
+ - Collapsible and Collapsed fields for Panel and FieldSet.
+
+## 2.31.1
+### Added
+ - `moment` description to calculated and conditional sections.
+ - Calculated value section for DateTime component.
+
+### Changed
+ - Upgrade ng-formio to 2.31.1
+ - Upgrade formiojs to 2.30.1
+ - Structure of form builder page for DateTime component.
+
 ## 2.31.0
 ### Changed
  - Upgrade ng-formio to v2.31.0
@@ -53,7 +73,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
  - The ability to set any component to show their label within a datagrid.
- 
+
 ### Changed
  - How the labels are shown when they have "hideLabel" checked, where they are just a tooltip now.
 
