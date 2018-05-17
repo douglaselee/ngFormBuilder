@@ -28,7 +28,6 @@ module.exports = function() {
       '    <small>' +
       '      <p>Execute custom validation logic with JSON and <a href="http://jsonlogic.com/">JsonLogic</a>.</p>' +
       '      <p>Submission data is available as JsonLogic variables, with the same api key as your components.</p>' +
-      '      <p><a href="http://formio.github.io/formio.js/app/examples/conditions.html" target="_blank">Click here for an example</a></p>' +
       '    </small>' +
       '    <textarea class="form-control" rows="5" id="json" name="json" json-input ng-model="component.validate.json" placeholder=\'{ ... }\'></textarea>' +
       '  </div>' +

@@ -101,7 +101,6 @@ module.exports = function(app) {
             '<small>' +
               '<p>Execute custom next page with JSON and <a href="http://jsonlogic.com/">JsonLogic</a>.</p>' +
               '<p>Submission data is available as JsonLogic variables, with the same api key as your components.</p>' +
-              '<p><a href="http://formio.github.io/formio.js/app/examples/multiform.html" target="_blank">Click here for an example</a></p>' +
             '</small>' +
             '<textarea class="form-control" rows="5" id="json" name="json" json-input ng-model="component.nextPage" placeholder="{ ... }"></textarea>' +
           '</div>' +

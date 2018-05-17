@@ -86,7 +86,6 @@ module.exports = function(app) {
         '        <small>' +
         '          <p>Execute custom default value using <a href="http://jsonlogic.com/">JSONLogic</a>.</p>' +
         '          <p>Submission data is available as JsonLogic variables, with the same api key as your components.</p>' +
-        '          <p><a href="http://formio.github.io/formio.js/app/examples/calculated.html" target="_blank">Click here for an example</a></p>' +
         '        </small>' +
         '        <textarea class="form-control" rows="5" id="json" name="json" json-input ng-model="component.customDefaultValue" placeholder=\'{ ... }\'></textarea>' +
         '      </div>' +
@@ -107,7 +106,6 @@ module.exports = function(app) {
         '        <small>' +
         '          <p>Execute custom calculation logic with JSON and <a href="http://jsonlogic.com/">JSONLogic</a>.</p>' +
         '          <p>Submission data is available as JsonLogic variables, with the same api key as your components.</p>' +
-        '          <p><a href="http://formio.github.io/formio.js/app/examples/calculated.html" target="_blank">Click here for an example</a></p>' +
         '        </small>' +
         '        <textarea class="form-control" rows="5" id="json" name="json" json-input ng-model="component.calculateValue" placeholder=\'{ ... }\'></textarea>' +
         '      </div>' +
