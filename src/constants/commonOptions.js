@@ -12,7 +12,17 @@ module.exports = {
   defaultValue: {
     label: 'Default Value',
     placeholder: 'Default Value',
-    tooltip: 'The will be the value for this field, before user interaction. Having a default value will override the placeholder text.'
+    tooltip: 'This will be the value for this field, before user interaction. Having a default value will override the placeholder text.'
+  },
+  defaultScanner: {
+    label: 'Default Scanner',
+    placeholder: 'Default Scanner',
+    tooltip: 'This will be the value for the Scanner field, before user interaction. Having a default value will override the placeholder text.'
+  },
+  defaultProfile: {
+    label: 'Default Profile',
+    placeholder: 'Default Profile',
+    tooltip: 'This will be the value for the Profile field, before user interaction. Having a default value will override the placeholder text.'
   },
   placeholder: {
     label: 'Placeholder',
@@ -175,6 +185,11 @@ module.exports = {
     label: 'Upload Url',
     placeholder: 'Enter the url to post the files to.',
     tooltip: 'See <a href=\'https://github.com/danialfarid/ng-file-upload#server-side\' target=\'_blank\'>https://github.com/danialfarid/ng-file-upload#server-side</a> for how to set up the server.'
+  },
+  nxUrl: {
+    label: 'PaperStream NX Manager API Url',
+    placeholder: 'https://192.168.13.190:30447/api/v1/scanners/',
+    tooltip: 'Enter the Url for the PaperStream NX Manager API'
   },
   filePattern: {
     label: 'File Pattern',
