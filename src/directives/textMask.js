@@ -2,7 +2,6 @@
 * A directive for an input mask for default value.
 */
 var maskInput = require('vanilla-text-mask').default;
-//r formioUtils = require('formiojs/lib/utils').default;
 var formioUtils = require('formiojs/utils').default;
 module.exports = function() {
   return {
