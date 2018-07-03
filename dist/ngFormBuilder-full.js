@@ -1,4 +1,159 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.formioBuilder = f()}})(function(){var define,module,exports;return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(_dereq_,module,exports){
+(function (root, factory) {
+  // AMD
+  if (typeof define === 'function' && define.amd) define(['angular'], factory);
+  // Global
+  else factory(angular);
+}(this, function (angular) {
+
+  angular
+  .module('ckeditor', [])
+  .directive('ckeditor', ['$parse', ckeditorDirective]);
+
+  // Polyfill setImmediate function.
+  var setImmediate = window && window.setImmediate ? window.setImmediate : function (fn) {
+    setTimeout(fn, 0);
+  };
+
+  /**
+   * CKEditor directive.
+   *
+   * @example
+   * <div ckeditor="options" ng-model="content" ready="onReady()"></div>
+   */
+
+  function ckeditorDirective($parse) {
+    return {
+      restrict: 'A',
+      require: ['ckeditor', 'ngModel'],
+      controller: [
+        '$scope',
+        '$element',
+        '$attrs',
+        '$parse',
+        '$q',
+        ckeditorController
+      ],
+      link: function (scope, element, attrs, ctrls) {
+        // get needed controllers
+        var controller = ctrls[0]; // our own, see below
+        var ngModelController = ctrls[1];
+
+        // Initialize the editor content when it is ready.
+        controller.ready().then(function initialize() {
+          // Sync view on specific events.
+          ['dataReady', 'change', 'blur', 'saveSnapshot'].forEach(function (event) {
+            controller.onCKEvent(event, function syncView() {
+              ngModelController.$setViewValue(controller.instance.getData() || '');
+            });
+          });
+
+          controller.instance.setReadOnly(!! attrs.readonly);
+          attrs.$observe('readonly', function (readonly) {
+            controller.instance.setReadOnly(!! readonly);
+          });
+
+          // Defer the ready handler calling to ensure that the editor is
+          // completely ready and populated with data.
+          setImmediate(function () {
+            $parse(attrs.ready)(scope);
+          });
+        });
+
+        // Set editor data when view data change.
+        ngModelController.$render = function syncEditor() {
+          controller.ready().then(function () {
+            // "noSnapshot" prevent recording an undo snapshot
+            controller.instance.setData(ngModelController.$viewValue || '', {
+              noSnapshot: true,
+              callback: function () {
+                // Amends the top of the undo stack with the current DOM changes
+                // ie: merge snapshot with the first empty one
+                // http://docs.ckeditor.com/#!/api/CKEDITOR.editor-event-updateSnapshot
+                controller.instance.fire('updateSnapshot');
+              }
+            });
+          });
+        };
+      }
+    };
+  }
+
+  /**
+   * CKEditor controller.
+   */
+
+  function ckeditorController($scope, $element, $attrs, $parse, $q) {
+    var config = $parse($attrs.ckeditor)($scope) || {};
+    var editorElement = $element[0];
+    var instance;
+    var readyDeferred = $q.defer(); // a deferred to be resolved when the editor is ready
+
+    // Create editor instance.
+    if (editorElement.hasAttribute('contenteditable') &&
+        editorElement.getAttribute('contenteditable').toLowerCase() == 'true') {
+      instance = this.instance = CKEDITOR.inline(editorElement, config);
+    }
+    else {
+      instance = this.instance = CKEDITOR.replace(editorElement, config);
+    }
+
+    /**
+     * Listen on events of a given type.
+     * This make all event asynchronous and wrapped in $scope.$apply.
+     *
+     * @param {String} event
+     * @param {Function} listener
+     * @returns {Function} Deregistration function for this listener.
+     */
+
+    this.onCKEvent = function (event, listener) {
+      instance.on(event, asyncListener);
+
+      function asyncListener() {
+        var args = arguments;
+        setImmediate(function () {
+          applyListener.apply(null, args);
+        });
+      }
+
+      function applyListener() {
+        var args = arguments;
+        $scope.$apply(function () {
+          listener.apply(null, args);
+        });
+      }
+
+      // Return the deregistration function
+      return function $off() {
+        instance.removeListener(event, applyListener);
+      };
+    };
+
+    this.onCKEvent('instanceReady', function() {
+      readyDeferred.resolve(true);
+    });
+
+    /**
+     * Check if the editor if ready.
+     *
+     * @returns {Promise}
+     */
+    this.ready = function ready() {
+      return readyDeferred.promise;
+    };
+
+    // Destroy editor when the scope is destroyed.
+    $scope.$on('$destroy', function onDestroy() {
+      // do not delete too fast or pending events will throw errors
+      readyDeferred.promise.then(function() {
+        instance.destroy(false);
+      });
+    });
+  }
+}));
+
+},{}],2:[function(_dereq_,module,exports){
 /**
  * angular-drag-and-drop-lists v2.1.0
  *
@@ -650,7 +805,7 @@
 
 })(angular.module('dndLists', []));
 
-},{}],2:[function(_dereq_,module,exports){
+},{}],3:[function(_dereq_,module,exports){
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
@@ -1253,7 +1408,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ ])
 });
 ;
-},{}],3:[function(_dereq_,module,exports){
+},{}],4:[function(_dereq_,module,exports){
 (function (global){
 /* angular-moment.js / v1.2.0 / (c) 2013, 2014, 2015, 2016, 2017 Uri Shaked / MIT Licence */
 
@@ -1994,9 +2149,9 @@ return /******/ (function(modules) { // webpackBootstrap
 })();
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"angular":10,"moment":263}],4:[function(_dereq_,module,exports){
+},{"angular":11,"moment":271}],5:[function(_dereq_,module,exports){
 /**
- * @license AngularJS v1.7.0
+ * @license AngularJS v1.7.2
  * (c) 2010-2018 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -2708,7 +2863,7 @@ function sanitizeText(chars) {
 // define ngSanitize module and register $sanitize service
 angular.module('ngSanitize', [])
   .provider('$sanitize', $SanitizeProvider)
-  .info({ angularVersion: '1.7.0' });
+  .info({ angularVersion: '1.7.2' });
 
 /**
  * @ngdoc filter
@@ -2909,11 +3064,11 @@ angular.module('ngSanitize').filter('linky', ['$sanitize', function($sanitize) {
 
 })(window, window.angular);
 
-},{}],5:[function(_dereq_,module,exports){
+},{}],6:[function(_dereq_,module,exports){
 _dereq_('./angular-sanitize');
 module.exports = 'ngSanitize';
 
-},{"./angular-sanitize":4}],6:[function(_dereq_,module,exports){
+},{"./angular-sanitize":5}],7:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -3243,7 +3398,7 @@ angular.module('ui.ace', [])
     };
   }]);
 
-},{}],7:[function(_dereq_,module,exports){
+},{}],8:[function(_dereq_,module,exports){
 /*
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
@@ -11047,14 +11202,14 @@ angular.module('ui.bootstrap.datepickerPopup').run(function() {!angular.$$csp().
 angular.module('ui.bootstrap.tooltip').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTooltipCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-tooltip-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-bottom > .tooltip-arrow,[uib-popover-popup].popover.top-left > .arrow,[uib-popover-popup].popover.top-right > .arrow,[uib-popover-popup].popover.bottom-left > .arrow,[uib-popover-popup].popover.bottom-right > .arrow,[uib-popover-popup].popover.left-top > .arrow,[uib-popover-popup].popover.left-bottom > .arrow,[uib-popover-popup].popover.right-top > .arrow,[uib-popover-popup].popover.right-bottom > .arrow,[uib-popover-html-popup].popover.top-left > .arrow,[uib-popover-html-popup].popover.top-right > .arrow,[uib-popover-html-popup].popover.bottom-left > .arrow,[uib-popover-html-popup].popover.bottom-right > .arrow,[uib-popover-html-popup].popover.left-top > .arrow,[uib-popover-html-popup].popover.left-bottom > .arrow,[uib-popover-html-popup].popover.right-top > .arrow,[uib-popover-html-popup].popover.right-bottom > .arrow,[uib-popover-template-popup].popover.top-left > .arrow,[uib-popover-template-popup].popover.top-right > .arrow,[uib-popover-template-popup].popover.bottom-left > .arrow,[uib-popover-template-popup].popover.bottom-right > .arrow,[uib-popover-template-popup].popover.left-top > .arrow,[uib-popover-template-popup].popover.left-bottom > .arrow,[uib-popover-template-popup].popover.right-top > .arrow,[uib-popover-template-popup].popover.right-bottom > .arrow{top:auto;bottom:auto;left:auto;right:auto;margin:0;}[uib-popover-popup].popover,[uib-popover-html-popup].popover,[uib-popover-template-popup].popover{display:block !important;}</style>'); angular.$$uibTooltipCss = true; });
 angular.module('ui.bootstrap.timepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTimepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-time input{width:50px;}</style>'); angular.$$uibTimepickerCss = true; });
 angular.module('ui.bootstrap.typeahead').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTypeaheadCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-typeahead-popup].dropdown-menu{display:block;}</style>'); angular.$$uibTypeaheadCss = true; });
-},{}],8:[function(_dereq_,module,exports){
+},{}],9:[function(_dereq_,module,exports){
 _dereq_('./dist/ui-bootstrap-tpls');
 
 module.exports = 'ui.bootstrap';
 
-},{"./dist/ui-bootstrap-tpls":7}],9:[function(_dereq_,module,exports){
+},{"./dist/ui-bootstrap-tpls":8}],10:[function(_dereq_,module,exports){
 /**
- * @license AngularJS v1.7.0
+ * @license AngularJS v1.7.2
  * (c) 2010-2018 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -11067,7 +11222,8 @@ module.exports = 'ui.bootstrap';
 */
 
 var minErrConfig = {
-  objectMaxDepth: 5
+  objectMaxDepth: 5,
+  urlErrorParamsEnabled: true
 };
 
 /**
@@ -11090,11 +11246,20 @@ var minErrConfig = {
  * * `objectMaxDepth`  **{Number}** - The max depth for stringifying objects. Setting to a
  *   non-positive or non-numeric value, removes the max depth limit.
  *   Default: 5
+ *
+ * * `urlErrorParamsEnabled`  **{Boolean}** - Specifies wether the generated error url will
+ *   contain the parameters of the thrown error. Disabling the parameters can be useful if the
+ *   generated error url is very long.
+ *
+ *   Default: true. When used without argument, it returns the current value.
  */
 function errorHandlingConfig(config) {
   if (isObject(config)) {
     if (isDefined(config.objectMaxDepth)) {
       minErrConfig.objectMaxDepth = isValidObjectMaxDepth(config.objectMaxDepth) ? config.objectMaxDepth : NaN;
+    }
+    if (isDefined(config.urlErrorParamsEnabled) && isBoolean(config.urlErrorParamsEnabled)) {
+      minErrConfig.urlErrorParamsEnabled = config.urlErrorParamsEnabled;
     }
   } else {
     return minErrConfig;
@@ -11109,6 +11274,7 @@ function errorHandlingConfig(config) {
 function isValidObjectMaxDepth(maxDepth) {
   return isNumber(maxDepth) && maxDepth > 0;
 }
+
 
 /**
  * @description
@@ -11143,7 +11309,7 @@ function isValidObjectMaxDepth(maxDepth) {
 function minErr(module, ErrorConstructor) {
   ErrorConstructor = ErrorConstructor || Error;
 
-  var url = 'https://errors.angularjs.org/1.7.0/';
+  var url = 'https://errors.angularjs.org/1.7.2/';
   var regex = url.replace('.', '\\.') + '[\\s\\S]*';
   var errRegExp = new RegExp(regex, 'g');
 
@@ -11173,8 +11339,10 @@ function minErr(module, ErrorConstructor) {
 
     message += '\n' + url + (module ? module + '/' : '') + code;
 
-    for (i = 0, paramPrefix = '?'; i < templateArgs.length; i++, paramPrefix = '&') {
-      message += paramPrefix + 'p' + i + '=' + encodeURIComponent(templateArgs[i]);
+    if (minErrConfig.urlErrorParamsEnabled) {
+      for (i = 0, paramPrefix = '?'; i < templateArgs.length; i++, paramPrefix = '&') {
+        message += paramPrefix + 'p' + i + '=' + encodeURIComponent(templateArgs[i]);
+      }
     }
 
     return new ErrorConstructor(message);
@@ -13732,6 +13900,7 @@ function toDebugString(obj, maxDepth) {
   ngInitDirective,
   ngNonBindableDirective,
   ngPluralizeDirective,
+  ngRefDirective,
   ngRepeatDirective,
   ngShowDirective,
   ngStyleDirective,
@@ -13820,11 +13989,11 @@ function toDebugString(obj, maxDepth) {
 var version = {
   // These placeholder strings will be replaced by grunt's `build` task.
   // They need to be double- or single-quoted.
-  full: '1.7.0',
+  full: '1.7.2',
   major: 1,
   minor: 7,
-  dot: 0,
-  codeName: 'nonexistent-physiology'
+  dot: 2,
+  codeName: 'extreme-compatiplication'
 };
 
 
@@ -13898,6 +14067,7 @@ function publishExternalAPI(angular) {
             ngInit: ngInitDirective,
             ngNonBindable: ngNonBindableDirective,
             ngPluralize: ngPluralizeDirective,
+            ngRef: ngRefDirective,
             ngRepeat: ngRepeatDirective,
             ngShow: ngShowDirective,
             ngStyle: ngStyleDirective,
@@ -13970,7 +14140,7 @@ function publishExternalAPI(angular) {
       });
     }
   ])
-  .info({ angularVersion: '1.7.0' });
+  .info({ angularVersion: '1.7.2' });
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -18592,6 +18762,11 @@ function $TemplateCacheProvider() {
  *   One-way binding is useful if you do not plan to propagate changes to your isolated scope bindings
  *   back to the parent. However, it does not make this completely impossible.
  *
+ *   By default, the {@link ng.$rootScope.Scope#$watch `$watch`}
+ *   method is used for tracking changes, and the equality check is based on object identity.
+ *   It's also possible to watch the evaluated value shallowly with
+ *   {@link ng.$rootScope.Scope#$watchCollection `$watchCollection`}: use `<*` or `<*attr`
+ *
  * * `&` or `&attr` - provides a way to execute an expression in the context of the parent scope. If
  *   no `attr` name is specified then the attribute name is assumed to be the same as the local name.
  *   Given `<my-component my-attr="count = count + value">` and the isolate scope definition `scope: {
@@ -19321,7 +19496,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
   var bindingCache = createMap();
 
   function parseIsolateBindings(scope, directiveName, isController) {
-    var LOCAL_REGEXP = /^([@&<]|=(\*?))(\??)\s*([\w$]*)$/;
+    var LOCAL_REGEXP = /^([@&]|[=<](\*?))(\??)\s*([\w$]*)$/;
 
     var bindings = createMap();
 
@@ -20823,7 +20998,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
               // We have transclusion slots,
               // collect them up, compile them and store their transclusion functions
-              $template = [];
+              $template = window.document.createDocumentFragment();
 
               var slotMap = createMap();
               var filledSlots = createMap();
@@ -20851,10 +21026,10 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
                 var slotName = slotMap[directiveNormalize(nodeName_(node))];
                 if (slotName) {
                   filledSlots[slotName] = true;
-                  slots[slotName] = slots[slotName] || [];
-                  slots[slotName].push(node);
+                  slots[slotName] = slots[slotName] || window.document.createDocumentFragment();
+                  slots[slotName].appendChild(node);
                 } else {
-                  $template.push(node);
+                  $template.appendChild(node);
                 }
               });
 
@@ -20868,9 +21043,11 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
               for (var slotName in slots) {
                 if (slots[slotName]) {
                   // Only define a transclusion function if the slot was filled
-                  slots[slotName] = compilationGenerator(mightHaveMultipleTransclusionError, slots[slotName], transcludeFn);
+                  slots[slotName] = compilationGenerator(mightHaveMultipleTransclusionError, slots[slotName].childNodes, transcludeFn);
                 }
               }
+
+              $template = $template.childNodes;
             }
 
             $compileNode.empty(); // clear contents
@@ -21868,7 +22045,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             var initialValue = destination[scopeName] = parentGet(scope);
             initialChanges[scopeName] = new SimpleChange(_UNINITIALIZED_VALUE, destination[scopeName]);
 
-            removeWatch = scope.$watch(parentGet, function parentValueWatchAction(newValue, oldValue) {
+            removeWatch = scope[definition.collection ? '$watchCollection' : '$watch'](parentGet, function parentValueWatchAction(newValue, oldValue) {
               if (oldValue === newValue) {
                 if (oldValue === initialValue || (isLiteral && equals(oldValue, initialValue))) {
                   return;
@@ -36152,7 +36329,11 @@ var inputType = {
    * error docs for more information and an example of how to convert your model if necessary.
    * </div>
    *
-   * ## Issues with HTML5 constraint validation
+   *
+   *
+   * @knownIssue
+   *
+   * ### HTML5 constraint validation and `allowInvalid`
    *
    * In browsers that follow the
    * [HTML5 specification](https://html.spec.whatwg.org/multipage/forms.html#number-state-%28type=number%29),
@@ -36161,6 +36342,17 @@ var inputType = {
    * which means the view / model values in `ngModel` and subsequently the scope value
    * will also be an empty string.
    *
+   * @knownIssue
+   *
+   * ### Large numbers and `step` validation
+   *
+   * The `step` validation will not work correctly for very large numbers (e.g. 9999999999) due to
+   * Javascript's arithmetic limitations. If you need to handle large numbers, purpose-built
+   * libraries (e.g. https://github.com/MikeMcl/big.js/), can be included into AngularJS by
+   * {@link guide/forms#modifying-built-in-validators overwriting the validators}
+   * for `number` and / or `step`, or by {@link guide/forms#custom-validation applying custom validators}
+   * to an `input[text]` element. The source for `input[number]` type can be used as a starting
+   * point for both implementations.
    *
    * @param {string} ngModel Assignable AngularJS expression to data-bind to.
    * @param {string=} name Property name of the form under which the control is published.
@@ -40478,6 +40670,7 @@ function NgModelController($scope, $exceptionHandler, $attr, $element, $parse, $
   this.$$currentValidationRunId = 0;
 
   this.$$scope = $scope;
+  this.$$rootScope = $scope.$root;
   this.$$attr = $attr;
   this.$$element = $element;
   this.$$animate = $animate;
@@ -41055,7 +41248,7 @@ NgModelController.prototype = {
       this.$$pendingDebounce = this.$$timeout(function() {
         that.$commitViewValue();
       }, debounceDelay);
-    } else if (this.$$scope.$root.$$phase) {
+    } else if (this.$$rootScope.$$phase) {
       this.$commitViewValue();
     } else {
       this.$$scope.$apply(function() {
@@ -41611,7 +41804,7 @@ ModelOptions.prototype = {
     options = extend({}, options);
 
     // Inherit options from the parent if specified by the value `"$inherit"`
-    forEach(options, /* @this */ function(option, key) {
+    forEach(options, /** @this */ function(option, key) {
       if (option === '$inherit') {
         if (key === '*') {
           inheritAll = true;
@@ -43055,6 +43248,301 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
       function updateElementText(newText) {
         element.text(newText || '');
       }
+    }
+  };
+}];
+
+/**
+ * @ngdoc directive
+ * @name ngRef
+ * @restrict A
+ *
+ * @description
+ * The `ngRef` attribute tells AngularJS to assign the controller of a component (or a directive)
+ * to the given property in the current scope. It is also possible to add the jqlite-wrapped DOM
+ * element to the scope.
+ *
+ * If the element with `ngRef` is destroyed `null` is assigned to the property.
+ *
+ * Note that if you want to assign from a child into the parent scope, you must initialize the
+ * target property on the parent scope, otherwise `ngRef` will assign on the child scope.
+ * This commonly happens when assigning elements or components wrapped in {@link ngIf} or
+ * {@link ngRepeat}. See the second example below.
+ *
+ *
+ * @element ANY
+ * @param {string} ngRef property name - A valid AngularJS expression identifier to which the
+ *                       controller or jqlite-wrapped DOM element will be bound.
+ * @param {string=} ngRefRead read value - The name of a directive (or component) on this element,
+ *                            or the special string `$element`. If a name is provided, `ngRef` will
+ *                            assign the matching controller. If `$element` is provided, the element
+ *                            itself is assigned (even if a controller is available).
+ *
+ *
+ * @example
+ * ### Simple toggle
+ * This example shows how the controller of the component toggle
+ * is reused in the template through the scope to use its logic.
+ * <example name="ng-ref-component" module="myApp">
+ *   <file name="index.html">
+ *     <my-toggle ng-ref="myToggle"></my-toggle>
+ *     <button ng-click="myToggle.toggle()">Toggle</button>
+ *     <div ng-show="myToggle.isOpen()">
+ *       You are using a component in the same template to show it.
+ *     </div>
+ *   </file>
+ *   <file name="index.js">
+ *     angular.module('myApp', [])
+ *     .component('myToggle', {
+ *       controller: function ToggleController() {
+ *         var opened = false;
+ *         this.isOpen = function() { return opened; };
+ *         this.toggle = function() { opened = !opened; };
+ *       }
+ *     });
+ *   </file>
+ *   <file name="protractor.js" type="protractor">
+ *      it('should publish the toggle into the scope', function() {
+ *        var toggle = element(by.buttonText('Toggle'));
+ *        expect(toggle.evaluate('myToggle.isOpen()')).toEqual(false);
+ *        toggle.click();
+ *        expect(toggle.evaluate('myToggle.isOpen()')).toEqual(true);
+ *      });
+ *   </file>
+ * </example>
+ *
+ * @example
+ * ### ngRef inside scopes
+ * This example shows how `ngRef` works with child scopes. The `ngRepeat`-ed `myWrapper` components
+ * are assigned to the scope of `myRoot`, because the `toggles` property has been initialized.
+ * The repeated `myToggle` components are published to the child scopes created by `ngRepeat`.
+ * `ngIf` behaves similarly - the assignment of `myToggle` happens in the `ngIf` child scope,
+ * because the target property has not been initialized on the `myRoot` component controller.
+ *
+ * <example name="ng-ref-scopes" module="myApp">
+ *   <file name="index.html">
+ *     <my-root></my-root>
+ *   </file>
+ *   <file name="index.js">
+ *     angular.module('myApp', [])
+ *     .component('myRoot', {
+ *       templateUrl: 'root.html',
+ *       controller: function() {
+ *         this.wrappers = []; // initialize the array so that the wrappers are assigned into the parent scope
+ *       }
+ *     })
+ *     .component('myToggle', {
+ *       template: '<strong>myToggle</strong><button ng-click="$ctrl.toggle()" ng-transclude></button>',
+ *       transclude: true,
+ *       controller: function ToggleController() {
+ *         var opened = false;
+ *         this.isOpen = function() { return opened; };
+ *         this.toggle = function() { opened = !opened; };
+ *       }
+ *     })
+ *     .component('myWrapper', {
+ *       transclude: true,
+ *       template: '<strong>myWrapper</strong>' +
+ *         '<div>ngRepeatToggle.isOpen(): {{$ctrl.ngRepeatToggle.isOpen() | json}}</div>' +
+ *         '<my-toggle ng-ref="$ctrl.ngRepeatToggle"><ng-transclude></ng-transclude></my-toggle>'
+ *     });
+ *   </file>
+ *   <file name="root.html">
+ *     <strong>myRoot</strong>
+ *     <my-toggle ng-ref="$ctrl.outerToggle">Outer Toggle</my-toggle>
+ *     <div>outerToggle.isOpen(): {{$ctrl.outerToggle.isOpen() | json}}</div>
+ *     <div><em>wrappers assigned to root</em><br>
+ *     <div ng-repeat="wrapper in $ctrl.wrappers">
+ *       wrapper.ngRepeatToggle.isOpen(): {{wrapper.ngRepeatToggle.isOpen() | json}}
+ *     </div>
+ *
+ *     <ul>
+ *       <li ng-repeat="(index, value) in [1,2,3]">
+ *         <strong>ngRepeat</strong>
+ *         <div>outerToggle.isOpen(): {{$ctrl.outerToggle.isOpen() | json}}</div>
+ *         <my-wrapper ng-ref="$ctrl.wrappers[index]">ngRepeat Toggle {{$index + 1}}</my-wrapper>
+ *       </li>
+ *     </ul>
+ *
+ *     <div>ngIfToggle.isOpen(): {{ngIfToggle.isOpen()}} // This is always undefined because it's
+ *       assigned to the child scope created by ngIf.
+ *     </div>
+ *     <div ng-if="true">
+          <strong>ngIf</strong>
+ *        <my-toggle ng-ref="ngIfToggle">ngIf Toggle</my-toggle>
+ *        <div>ngIfToggle.isOpen(): {{ngIfToggle.isOpen() | json}}</div>
+ *        <div>outerToggle.isOpen(): {{$ctrl.outerToggle.isOpen() | json}}</div>
+ *     </div>
+ *   </file>
+ *   <file name="styles.css">
+ *     ul {
+ *       list-style: none;
+ *       padding-left: 0;
+ *     }
+ *
+ *     li[ng-repeat] {
+ *       background: lightgreen;
+ *       padding: 8px;
+ *       margin: 8px;
+ *     }
+ *
+ *     [ng-if] {
+ *       background: lightgrey;
+ *       padding: 8px;
+ *     }
+ *
+ *     my-root {
+ *       background: lightgoldenrodyellow;
+ *       padding: 8px;
+ *       display: block;
+ *     }
+ *
+ *     my-wrapper {
+ *       background: lightsalmon;
+ *       padding: 8px;
+ *       display: block;
+ *     }
+ *
+ *     my-toggle {
+ *       background: lightblue;
+ *       padding: 8px;
+ *       display: block;
+ *     }
+ *   </file>
+ *   <file name="protractor.js" type="protractor">
+ *      var OuterToggle = function() {
+ *        this.toggle = function() {
+ *          element(by.buttonText('Outer Toggle')).click();
+ *        };
+ *        this.isOpen = function() {
+ *          return element.all(by.binding('outerToggle.isOpen()')).first().getText();
+ *        };
+ *      };
+ *      var NgRepeatToggle = function(i) {
+ *        var parent = element.all(by.repeater('(index, value) in [1,2,3]')).get(i - 1);
+ *        this.toggle = function() {
+ *          element(by.buttonText('ngRepeat Toggle ' + i)).click();
+ *        };
+ *        this.isOpen = function() {
+ *          return parent.element(by.binding('ngRepeatToggle.isOpen() | json')).getText();
+ *        };
+ *        this.isOuterOpen = function() {
+ *          return parent.element(by.binding('outerToggle.isOpen() | json')).getText();
+ *        };
+ *      };
+ *      var NgRepeatToggles = function() {
+ *        var toggles = [1,2,3].map(function(i) { return new NgRepeatToggle(i); });
+ *        this.forEach = function(fn) {
+ *          toggles.forEach(fn);
+ *        };
+ *        this.isOuterOpen = function(i) {
+ *          return toggles[i - 1].isOuterOpen();
+ *        };
+ *      };
+ *      var NgIfToggle = function() {
+ *        var parent = element(by.css('[ng-if]'));
+ *        this.toggle = function() {
+ *          element(by.buttonText('ngIf Toggle')).click();
+ *        };
+ *        this.isOpen = function() {
+ *          return by.binding('ngIfToggle.isOpen() | json').getText();
+ *        };
+ *        this.isOuterOpen = function() {
+ *          return parent.element(by.binding('outerToggle.isOpen() | json')).getText();
+ *        };
+ *      };
+ *
+ *      it('should toggle the outer toggle', function() {
+ *        var outerToggle = new OuterToggle();
+ *        expect(outerToggle.isOpen()).toEqual('outerToggle.isOpen(): false');
+ *        outerToggle.toggle();
+ *        expect(outerToggle.isOpen()).toEqual('outerToggle.isOpen(): true');
+ *      });
+ *
+ *      it('should toggle all outer toggles', function() {
+ *        var outerToggle = new OuterToggle();
+ *        var repeatToggles = new NgRepeatToggles();
+ *        var ifToggle = new NgIfToggle();
+ *        expect(outerToggle.isOpen()).toEqual('outerToggle.isOpen(): false');
+ *        expect(repeatToggles.isOuterOpen(1)).toEqual('outerToggle.isOpen(): false');
+ *        expect(repeatToggles.isOuterOpen(2)).toEqual('outerToggle.isOpen(): false');
+ *        expect(repeatToggles.isOuterOpen(3)).toEqual('outerToggle.isOpen(): false');
+ *        expect(ifToggle.isOuterOpen()).toEqual('outerToggle.isOpen(): false');
+ *        outerToggle.toggle();
+ *        expect(outerToggle.isOpen()).toEqual('outerToggle.isOpen(): true');
+ *        expect(repeatToggles.isOuterOpen(1)).toEqual('outerToggle.isOpen(): true');
+ *        expect(repeatToggles.isOuterOpen(2)).toEqual('outerToggle.isOpen(): true');
+ *        expect(repeatToggles.isOuterOpen(3)).toEqual('outerToggle.isOpen(): true');
+ *        expect(ifToggle.isOuterOpen()).toEqual('outerToggle.isOpen(): true');
+ *      });
+ *
+ *      it('should toggle each repeat iteration separately', function() {
+ *        var repeatToggles = new NgRepeatToggles();
+ *
+ *        repeatToggles.forEach(function(repeatToggle) {
+ *          expect(repeatToggle.isOpen()).toEqual('ngRepeatToggle.isOpen(): false');
+ *          expect(repeatToggle.isOuterOpen()).toEqual('outerToggle.isOpen(): false');
+ *          repeatToggle.toggle();
+ *          expect(repeatToggle.isOpen()).toEqual('ngRepeatToggle.isOpen(): true');
+ *          expect(repeatToggle.isOuterOpen()).toEqual('outerToggle.isOpen(): false');
+ *        });
+ *      });
+ *   </file>
+ * </example>
+ *
+ */
+
+var ngRefMinErr = minErr('ngRef');
+
+var ngRefDirective = ['$parse', function($parse) {
+  return {
+    priority: -1, // Needed for compatibility with element transclusion on the same element
+    restrict: 'A',
+    compile: function(tElement, tAttrs) {
+      // Get the expected controller name, converts <data-some-thing> into "someThing"
+      var controllerName = directiveNormalize(nodeName_(tElement));
+
+      // Get the expression for value binding
+      var getter = $parse(tAttrs.ngRef);
+      var setter = getter.assign || function() {
+        throw ngRefMinErr('nonassign', 'Expression in ngRef="{0}" is non-assignable!', tAttrs.ngRef);
+      };
+
+      return function(scope, element, attrs) {
+        var refValue;
+
+        if (attrs.hasOwnProperty('ngRefRead')) {
+          if (attrs.ngRefRead === '$element') {
+            refValue = element;
+          } else {
+            refValue = element.data('$' + attrs.ngRefRead + 'Controller');
+
+            if (!refValue) {
+              throw ngRefMinErr(
+                'noctrl',
+                'The controller for ngRefRead="{0}" could not be found on ngRef="{1}"',
+                attrs.ngRefRead,
+                tAttrs.ngRef
+              );
+            }
+          }
+        } else {
+          refValue = element.data('$' + controllerName + 'Controller');
+        }
+
+        refValue = refValue || element;
+
+        setter(scope, refValue);
+
+        // when the element is removed, remove it (nullify it)
+        element.on('$destroy', function() {
+          // only remove it if value has not changed,
+          // because animations (and other procedures) may duplicate elements
+          if (getter(scope) === refValue) {
+            setter(scope, null);
+          }
+        });
+      };
     }
   };
 }];
@@ -46156,11 +46644,11 @@ $provide.value("$locale", {
 })(window);
 
 !window.angular.$$csp().noInlineStyle && window.angular.element(document.head).prepend('<style type="text/css">@charset "UTF-8";[ng\\:cloak],[ng-cloak],[data-ng-cloak],[x-ng-cloak],.ng-cloak,.x-ng-cloak,.ng-hide:not(.ng-hide-animate){display:none !important;}ng\\:form{display:block;}.ng-animate-shim{visibility:hidden;}.ng-anchor{position:absolute;}</style>');
-},{}],10:[function(_dereq_,module,exports){
+},{}],11:[function(_dereq_,module,exports){
 _dereq_('./angular');
 module.exports = angular;
 
-},{"./angular":9}],11:[function(_dereq_,module,exports){
+},{"./angular":10}],12:[function(_dereq_,module,exports){
 // https://github.com/Gillardo/bootstrap-ui-datetime-picker
 // Version: 2.6.3
 // Released: 2018-04-25 
@@ -46963,7 +47451,7 @@ angular.module('ui.bootstrap.datetimepicker').run(['$templateCache', function($t
 if(typeof exports === 'object' && typeof module === 'object') {
     module.exports = 'ui.bootstrap.datetimepicker';
 }
-},{}],12:[function(_dereq_,module,exports){
+},{}],13:[function(_dereq_,module,exports){
 // This file is autogenerated via the `commonjs` Grunt task. You can require() this file in a CommonJS environment.
 _dereq_('../../js/transition.js')
 _dereq_('../../js/alert.js')
@@ -46977,7 +47465,7 @@ _dereq_('../../js/popover.js')
 _dereq_('../../js/scrollspy.js')
 _dereq_('../../js/tab.js')
 _dereq_('../../js/affix.js')
-},{"../../js/affix.js":13,"../../js/alert.js":14,"../../js/button.js":15,"../../js/carousel.js":16,"../../js/collapse.js":17,"../../js/dropdown.js":18,"../../js/modal.js":19,"../../js/popover.js":20,"../../js/scrollspy.js":21,"../../js/tab.js":22,"../../js/tooltip.js":23,"../../js/transition.js":24}],13:[function(_dereq_,module,exports){
+},{"../../js/affix.js":14,"../../js/alert.js":15,"../../js/button.js":16,"../../js/carousel.js":17,"../../js/collapse.js":18,"../../js/dropdown.js":19,"../../js/modal.js":20,"../../js/popover.js":21,"../../js/scrollspy.js":22,"../../js/tab.js":23,"../../js/tooltip.js":24,"../../js/transition.js":25}],14:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: affix.js v3.3.7
  * http://getbootstrap.com/javascript/#affix
@@ -47141,7 +47629,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],14:[function(_dereq_,module,exports){
+},{}],15:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: alert.js v3.3.7
  * http://getbootstrap.com/javascript/#alerts
@@ -47237,7 +47725,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],15:[function(_dereq_,module,exports){
+},{}],16:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: button.js v3.3.7
  * http://getbootstrap.com/javascript/#buttons
@@ -47364,7 +47852,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],16:[function(_dereq_,module,exports){
+},{}],17:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: carousel.js v3.3.7
  * http://getbootstrap.com/javascript/#carousel
@@ -47603,7 +48091,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],17:[function(_dereq_,module,exports){
+},{}],18:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: collapse.js v3.3.7
  * http://getbootstrap.com/javascript/#collapse
@@ -47817,7 +48305,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],18:[function(_dereq_,module,exports){
+},{}],19:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: dropdown.js v3.3.7
  * http://getbootstrap.com/javascript/#dropdowns
@@ -47984,7 +48472,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],19:[function(_dereq_,module,exports){
+},{}],20:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: modal.js v3.3.7
  * http://getbootstrap.com/javascript/#modals
@@ -48325,7 +48813,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],20:[function(_dereq_,module,exports){
+},{}],21:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: popover.js v3.3.7
  * http://getbootstrap.com/javascript/#popovers
@@ -48435,7 +48923,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],21:[function(_dereq_,module,exports){
+},{}],22:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: scrollspy.js v3.3.7
  * http://getbootstrap.com/javascript/#scrollspy
@@ -48609,7 +49097,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],22:[function(_dereq_,module,exports){
+},{}],23:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: tab.js v3.3.7
  * http://getbootstrap.com/javascript/#tabs
@@ -48766,7 +49254,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],23:[function(_dereq_,module,exports){
+},{}],24:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: tooltip.js v3.3.7
  * http://getbootstrap.com/javascript/#tooltip
@@ -49288,7 +49776,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],24:[function(_dereq_,module,exports){
+},{}],25:[function(_dereq_,module,exports){
 /* ========================================================================
  * Bootstrap: transition.js v3.3.7
  * http://getbootstrap.com/javascript/#transitions
@@ -49349,7 +49837,7 @@ _dereq_('../../js/affix.js')
 
 }(jQuery);
 
-},{}],25:[function(_dereq_,module,exports){
+},{}],26:[function(_dereq_,module,exports){
 exports.defaults = {};
 
 exports.set = function(name, value, options) {
@@ -49444,7 +49932,7 @@ exports.all = function() {
   return all;
 };
 
-},{}],26:[function(_dereq_,module,exports){
+},{}],27:[function(_dereq_,module,exports){
 (function (process){
 /*!
  * EventEmitter2
@@ -50230,7 +50718,1714 @@ exports.all = function() {
 }();
 
 }).call(this,_dereq_('_process'))
-},{"_process":349}],27:[function(_dereq_,module,exports){
+},{"_process":346}],28:[function(_dereq_,module,exports){
+(function (global){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; /* globals OktaAuth */
+
+// Intentionally use native-promise-only here... Other promise libraries (es6-promise)
+// duck-punch the global Promise definition which messes up Angular 2 since it
+// also duck-punches the global Promise definition. For now, keep native-promise-only.
+
+
+var _nativePromiseOnly = _dereq_('native-promise-only');
+
+var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
+
+_dereq_('whatwg-fetch');
+
+var _eventemitter = _dereq_('eventemitter2');
+
+var _browserCookies = _dereq_('browser-cookies');
+
+var _browserCookies2 = _interopRequireDefault(_browserCookies);
+
+var _shallowCopy = _dereq_('shallow-copy');
+
+var _shallowCopy2 = _interopRequireDefault(_shallowCopy);
+
+var _providers = _dereq_('./providers');
+
+var _providers2 = _interopRequireDefault(_providers);
+
+var _get2 = _dereq_('lodash/get');
+
+var _get3 = _interopRequireDefault(_get2);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var isBoolean = function isBoolean(val) {
+  return (typeof val === 'undefined' ? 'undefined' : _typeof(val)) === _typeof(true);
+};
+var isNil = function isNil(val) {
+  return val === null || val === undefined;
+};
+var isObject = function isObject(val) {
+  return val && (typeof val === 'undefined' ? 'undefined' : _typeof(val)) === 'object';
+};
+
+/**
+ * The Formio interface class.
+ *
+ *   let formio = new Formio('https://examples.form.io/example');
+ */
+
+var Formio = function () {
+  /* eslint-disable max-statements */
+  function Formio(path) {
+    var _this = this;
+
+    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+    _classCallCheck(this, Formio);
+
+    // Ensure we have an instance of Formio.
+    if (!(this instanceof Formio)) {
+      return new Formio(path);
+    }
+
+    // Initialize our variables.
+    this.base = '';
+    this.projectsUrl = '';
+    this.projectUrl = '';
+    this.projectId = '';
+    this.formUrl = '';
+    this.formsUrl = '';
+    this.formId = '';
+    this.submissionsUrl = '';
+    this.submissionUrl = '';
+    this.submissionId = '';
+    this.actionsUrl = '';
+    this.actionId = '';
+    this.actionUrl = '';
+    this.vsUrl = '';
+    this.vId = '';
+    this.vUrl = '';
+    this.query = '';
+
+    if (options.hasOwnProperty('base')) {
+      this.base = options.base;
+    } else if (Formio.baseUrl) {
+      this.base = Formio.baseUrl;
+    } else {
+      this.base = window.location.href.match(/http[s]?:\/\/api./)[0];
+    }
+
+    if (!path) {
+      // Allow user to create new projects if this was instantiated without
+      // a url
+      this.projectUrl = this.base + '/project';
+      this.projectsUrl = this.base + '/project';
+      this.projectId = false;
+      this.query = '';
+      return;
+    }
+
+    if (options.hasOwnProperty('project')) {
+      this.projectUrl = options.project;
+    }
+
+    var project = this.projectUrl || Formio.projectUrl;
+    var projectRegEx = /(^|\/)(project)($|\/[^/]+)/;
+    var isProjectUrl = path.search(projectRegEx) !== -1;
+
+    // The baseURL is the same as the projectUrl, and does not contain "/project/MONGO_ID" in
+    // its domain. This is almost certainly against the Open Source server.
+    if (project && this.base === project && !isProjectUrl) {
+      this.noProject = true;
+      this.projectUrl = this.base;
+    }
+
+    // Normalize to an absolute path.
+    if (path.indexOf('http') !== 0 && path.indexOf('//') !== 0) {
+      path = this.base + path;
+    }
+
+    var hostparts = this.getUrlParts(path);
+    var parts = [];
+    var hostName = hostparts[1] + hostparts[2];
+    path = hostparts.length > 3 ? hostparts[3] : '';
+    var queryparts = path.split('?');
+    if (queryparts.length > 1) {
+      path = queryparts[0];
+      this.query = '?' + queryparts[1];
+    }
+
+    // Register a specific path.
+    var registerPath = function registerPath(name, base) {
+      _this[name + 'sUrl'] = base + '/' + name;
+      var regex = new RegExp('/' + name + '/([^/]+)');
+      if (path.search(regex) !== -1) {
+        parts = path.match(regex);
+        _this[name + 'Url'] = parts ? base + parts[0] : '';
+        _this[name + 'Id'] = parts.length > 1 ? parts[1] : '';
+        base += parts[0];
+      }
+      return base;
+    };
+
+    // Register an array of items.
+    var registerItems = function registerItems(items, base, staticBase) {
+      for (var i in items) {
+        if (items.hasOwnProperty(i)) {
+          var item = items[i];
+          if (Array.isArray(item)) {
+            registerItems(item, base, true);
+          } else {
+            var newBase = registerPath(item, base);
+            base = staticBase ? base : newBase;
+          }
+        }
+      }
+    };
+
+    if (!this.projectUrl || this.projectUrl === this.base) {
+      this.projectUrl = hostName;
+    }
+
+    if (!this.noProject) {
+      // Determine the projectUrl and projectId
+      if (isProjectUrl) {
+        // Get project id as project/:projectId.
+        registerItems(['project'], hostName);
+        path = path.replace(projectRegEx, '');
+      } else if (hostName === this.base) {
+        // Get project id as first part of path (subdirectory).
+        if (hostparts.length > 3 && path.split('/').length > 1) {
+          var pathParts = path.split('/');
+          pathParts.shift(); // Throw away the first /.
+          this.projectId = pathParts.shift();
+          path = '/' + pathParts.join('/');
+          this.projectUrl = hostName + '/' + this.projectId;
+        }
+      } else {
+        // Get project id from subdomain.
+        if (hostparts.length > 2 && (hostparts[2].split('.').length > 2 || hostName.indexOf('localhost') !== -1)) {
+          this.projectUrl = hostName;
+          this.projectId = hostparts[2].split('.')[0];
+        }
+      }
+      this.projectsUrl = this.projectsUrl || this.base + '/project';
+    }
+
+    // Configure Form urls and form ids.
+    if (path.search(/(^|\/)(form)($|\/)/) !== -1) {
+      registerItems(['form', ['submission', 'action', 'v']], this.projectUrl);
+    } else {
+      var subRegEx = new RegExp('/(submission|action|v)($|/.*)');
+      var subs = path.match(subRegEx);
+      this.pathType = subs && subs.length > 1 ? subs[1] : '';
+      path = path.replace(subRegEx, '');
+      path = path.replace(/\/$/, '');
+      this.formsUrl = this.projectUrl + '/form';
+      this.formUrl = path ? this.projectUrl + path : '';
+      this.formId = path.replace(/^\/+|\/+$/g, '');
+      var items = ['submission', 'action', 'v'];
+      for (var i in items) {
+        if (items.hasOwnProperty(i)) {
+          var item = items[i];
+          this[item + 'sUrl'] = this.projectUrl + path + '/' + item;
+          if (this.pathType === item && subs.length > 2 && subs[2]) {
+            this[item + 'Id'] = subs[2].replace(/^\/+|\/+$/g, '');
+            this[item + 'Url'] = this.projectUrl + path + subs[0];
+          }
+        }
+      }
+    }
+
+    // Set the app url if it is not set.
+    if (!Formio.projectUrlSet) {
+      Formio.projectUrl = this.projectUrl;
+    }
+  }
+  /* eslint-enable max-statements */
+
+  _createClass(Formio, [{
+    key: 'delete',
+    value: function _delete(type, opts) {
+      var _id = type + 'Id';
+      var _url = type + 'Url';
+      if (!this[_id]) {
+        _nativePromiseOnly2.default.reject('Nothing to delete');
+      }
+      Formio.cache = {};
+      return this.makeRequest(type, this[_url], 'delete', null, opts);
+    }
+  }, {
+    key: 'index',
+    value: function index(type, query, opts) {
+      var _url = type + 'Url';
+      query = query || '';
+      if (query && isObject(query)) {
+        query = '?' + Formio.serialize(query.params);
+      }
+      return this.makeRequest(type, this[_url] + query, 'get', null, opts);
+    }
+  }, {
+    key: 'save',
+    value: function save(type, data, opts) {
+      var _id = type + 'Id';
+      var _url = type + 'Url';
+      var method = this[_id] || data._id ? 'put' : 'post';
+      var reqUrl = this[_id] ? this[_url] : this[type + 'sUrl'];
+      if (!this[_id] && data._id && method === 'put' && !(reqUrl.indexOf(data._id) !== -1)) {
+        reqUrl += '/' + data._id;
+      }
+      Formio.cache = {};
+      return this.makeRequest(type, reqUrl + this.query, method, data, opts);
+    }
+  }, {
+    key: 'load',
+    value: function load(type, query, opts) {
+      var _id = type + 'Id';
+      var _url = type + 'Url';
+      if (query && isObject(query)) {
+        query = Formio.serialize(query.params);
+      }
+      if (query) {
+        query = this.query ? this.query + '&' + query : '?' + query;
+      } else {
+        query = this.query;
+      }
+      if (!this[_id]) {
+        return _nativePromiseOnly2.default.reject('Missing ' + _id);
+      }
+      return this.makeRequest(type, this[_url] + query, 'get', null, opts);
+    }
+  }, {
+    key: 'makeRequest',
+    value: function makeRequest() {
+      for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      return Formio.makeRequest.apply(Formio, [this].concat(args));
+    }
+  }, {
+    key: 'loadProject',
+    value: function loadProject(query, opts) {
+      return this.load('project', query, opts);
+    }
+  }, {
+    key: 'saveProject',
+    value: function saveProject(data, opts) {
+      return this.save('project', data, opts);
+    }
+  }, {
+    key: 'deleteProject',
+    value: function deleteProject(opts) {
+      return this.delete('project', opts);
+    }
+  }, {
+    key: 'loadForm',
+    value: function loadForm(query, opts) {
+      var _this2 = this;
+
+      return this.load('form', query, opts).then(function (currentForm) {
+        // Check to see if there isn't a number in vId.
+        if (!currentForm.revisions || isNaN(parseInt(_this2.vId))) {
+          return currentForm;
+        }
+        // If a submission already exists but form is marked to load current version of form.
+        if (currentForm.revisions === 'current' && _this2.submissionId) {
+          return currentForm;
+        }
+        // If they specified a revision form, load the revised form components.
+        if (query && isObject(query)) {
+          query = Formio.serialize(query.params);
+        }
+        if (query) {
+          query = _this2.query ? _this2.query + '&' + query : '?' + query;
+        } else {
+          query = _this2.query;
+        }
+        return _this2.makeRequest('form', _this2.vUrl + query, 'get', null, opts).then(function (revisionForm) {
+          currentForm.components = revisionForm.components;
+          // Using object.assign so we don't cross polinate multiple form loads.
+          return Object.assign({}, currentForm);
+        })
+        // If we couldn't load the revision, just return the original form.
+        .catch(function () {
+          return Object.assign({}, currentForm);
+        });
+      });
+    }
+  }, {
+    key: 'saveForm',
+    value: function saveForm(data, opts) {
+      return this.save('form', data, opts);
+    }
+  }, {
+    key: 'deleteForm',
+    value: function deleteForm(opts) {
+      return this.delete('form', opts);
+    }
+  }, {
+    key: 'loadForms',
+    value: function loadForms(query, opts) {
+      return this.index('forms', query, opts);
+    }
+  }, {
+    key: 'loadSubmission',
+    value: function loadSubmission(query, opts) {
+      var _this3 = this;
+
+      return this.load('submission', query, opts).then(function (submission) {
+        _this3.vId = submission._fvid;
+        _this3.vUrl = _this3.formUrl + '/v/' + _this3.vId;
+        return submission;
+      });
+    }
+  }, {
+    key: 'saveSubmission',
+    value: function saveSubmission(data, opts) {
+      if (!isNaN(parseInt(this.vId))) {
+        data._fvid = this.vId;
+      }
+      return this.save('submission', data, opts);
+    }
+  }, {
+    key: 'deleteSubmission',
+    value: function deleteSubmission(opts) {
+      return this.delete('submission', opts);
+    }
+  }, {
+    key: 'loadSubmissions',
+    value: function loadSubmissions(query, opts) {
+      return this.index('submissions', query, opts);
+    }
+  }, {
+    key: 'loadAction',
+    value: function loadAction(query, opts) {
+      return this.load('action', query, opts);
+    }
+  }, {
+    key: 'saveAction',
+    value: function saveAction(data, opts) {
+      return this.save('action', data, opts);
+    }
+  }, {
+    key: 'deleteAction',
+    value: function deleteAction(opts) {
+      return this.delete('action', opts);
+    }
+  }, {
+    key: 'loadActions',
+    value: function loadActions(query, opts) {
+      return this.index('actions', query, opts);
+    }
+  }, {
+    key: 'availableActions',
+    value: function availableActions() {
+      return this.makeRequest('availableActions', this.formUrl + '/actions');
+    }
+  }, {
+    key: 'actionInfo',
+    value: function actionInfo(name) {
+      return this.makeRequest('actionInfo', this.formUrl + '/actions/' + name);
+    }
+  }, {
+    key: 'isObjectId',
+    value: function isObjectId(id) {
+      var checkForHexRegExp = new RegExp('^[0-9a-fA-F]{24}$');
+      return checkForHexRegExp.test(id);
+    }
+  }, {
+    key: 'getProjectId',
+    value: function getProjectId() {
+      if (!this.projectId) {
+        return _nativePromiseOnly2.default.resolve('');
+      }
+      if (this.isObjectId(this.projectId)) {
+        return _nativePromiseOnly2.default.resolve(this.projectId);
+      } else {
+        return this.loadProject().then(function (project) {
+          return project._id;
+        });
+      }
+    }
+  }, {
+    key: 'getFormId',
+    value: function getFormId() {
+      if (!this.formId) {
+        return _nativePromiseOnly2.default.resolve('');
+      }
+      if (this.isObjectId(this.formId)) {
+        return _nativePromiseOnly2.default.resolve(this.formId);
+      } else {
+        return this.loadForm().then(function (form) {
+          return form._id;
+        });
+      }
+    }
+  }, {
+    key: 'currentUser',
+    value: function currentUser(options) {
+      return Formio.currentUser(this, options);
+    }
+  }, {
+    key: 'accessInfo',
+    value: function accessInfo() {
+      return Formio.accessInfo(this);
+    }
+
+    /**
+     * Returns the JWT token for this instance.
+     *
+     * @return {*}
+     */
+
+  }, {
+    key: 'getToken',
+    value: function getToken() {
+      return Formio.getToken();
+    }
+
+    /**
+     * Returns a temporary authentication token for single purpose token generation.
+     */
+
+  }, {
+    key: 'getTempToken',
+    value: function getTempToken(expire, allowed) {
+      var token = Formio.getToken();
+      if (!token) {
+        return _nativePromiseOnly2.default.reject('You must be authenticated to generate a temporary auth token.');
+      }
+      return this.makeRequest('tempToken', this.projectUrl + '/token', 'GET', null, {
+        ignoreCache: true,
+        header: new Headers({
+          'x-expire': expire,
+          'x-allow': allowed
+        })
+      });
+    }
+
+    /**
+     * Get a download url for a submission PDF of this submission.
+     *
+     * @return {*}
+     */
+
+  }, {
+    key: 'getDownloadUrl',
+    value: function getDownloadUrl(form) {
+      var _this4 = this;
+
+      if (!this.submissionId) {
+        return _nativePromiseOnly2.default.resolve('');
+      }
+
+      if (!form) {
+        // Make sure to load the form first.
+        return this.loadForm().then(function (_form) {
+          if (!_form) {
+            return '';
+          }
+          return _this4.getDownloadUrl(_form);
+        });
+      }
+
+      var apiUrl = '/project/' + form.project;
+      apiUrl += '/form/' + form._id;
+      apiUrl += '/submission/' + this.submissionId;
+      apiUrl += '/download';
+
+      var download = this.base + apiUrl;
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        _this4.getTempToken(3600, 'GET:' + apiUrl).then(function (tempToken) {
+          download += '?token=' + tempToken.key;
+          resolve(download);
+        }, function () {
+          resolve(download);
+        }).catch(reject);
+      });
+    }
+  }, {
+    key: 'uploadFile',
+    value: function uploadFile(storage, file, fileName, dir, progressCallback, url) {
+      var _this5 = this;
+
+      var requestArgs = {
+        provider: storage,
+        method: 'upload',
+        file: file,
+        fileName: fileName,
+        dir: dir
+      };
+      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
+        return Formio.pluginGet('fileRequest', requestArgs).then(function (result) {
+          if (storage && isNil(result)) {
+            if (Formio.providers.storage.hasOwnProperty(storage)) {
+              var provider = new Formio.providers.storage[storage](_this5);
+              return provider.uploadFile(file, fileName, dir, progressCallback, url);
+            } else {
+              throw 'Storage provider not found';
+            }
+          }
+          return result || { url: '' };
+        });
+      });
+
+      return Formio.pluginAlter('wrapFileRequestPromise', request, requestArgs);
+    }
+  }, {
+    key: 'downloadFile',
+    value: function downloadFile(file) {
+      var _this6 = this;
+
+      var requestArgs = {
+        method: 'download',
+        file: file
+      };
+
+      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
+        return Formio.pluginGet('fileRequest', requestArgs).then(function (result) {
+          if (file.storage && isNil(result)) {
+            if (Formio.providers.storage.hasOwnProperty(file.storage)) {
+              var provider = new Formio.providers.storage[file.storage](_this6);
+              return provider.downloadFile(file);
+            } else {
+              throw 'Storage provider not found';
+            }
+          }
+          return result || { url: '' };
+        });
+      });
+
+      return Formio.pluginAlter('wrapFileRequestPromise', request, requestArgs);
+    }
+
+    // Determine if the user can submit the form.
+
+  }, {
+    key: 'canSubmit',
+    value: function canSubmit() {
+      /* eslint-disable max-statements, max-depth */
+      return _nativePromiseOnly2.default.all([this.loadForm(), this.currentUser(), this.accessInfo()]).then(function (results) {
+        var form = results.shift();
+        var user = results.shift();
+        var access = results.shift();
+
+        // Get the anonymous and admin roles.
+        var anonRole = {};
+        var adminRole = {};
+        for (var roleName in access.roles) {
+          if (access.roles.hasOwnProperty(roleName)) {
+            var role = access.roles[roleName];
+            if (role.default) {
+              anonRole = role;
+            }
+            if (role.admin) {
+              adminRole = role;
+            }
+          }
+        }
+
+        var canSubmit = false;
+        var canSubmitAnonymously = false;
+
+        // If the user is an admin, then they can submit this form.
+        if (user && user.roles.indexOf(adminRole._id) !== -1) {
+          return true;
+        }
+
+        for (var i in form.submissionAccess) {
+          if (form.submissionAccess.hasOwnProperty(i)) {
+            var subRole = form.submissionAccess[i];
+            if (subRole.type === 'create_all' || subRole.type === 'create_own') {
+              for (var j in subRole.roles) {
+                if (subRole.roles.hasOwnProperty(j)) {
+                  // Check if anonymous is allowed.
+                  if (anonRole._id === subRole.roles[j]) {
+                    canSubmitAnonymously = true;
+                  }
+                  // Check if the logged in user has the appropriate role.
+                  if (user && user.roles.indexOf(subRole.roles[j]) !== -1) {
+                    canSubmit = true;
+                    break;
+                  }
+                }
+              }
+              if (canSubmit) {
+                break;
+              }
+            }
+          }
+        }
+        // If their user cannot submit, but anonymous can, then delete token and allow submission.
+        if (!canSubmit && canSubmitAnonymously) {
+          canSubmit = true;
+          Formio.setUser(null);
+        }
+        return canSubmit;
+      });
+      /* eslint-enable max-statements, max-depth */
+    }
+  }, {
+    key: 'getUrlParts',
+    value: function getUrlParts(url) {
+      return Formio.getUrlParts(url, this);
+    }
+  }], [{
+    key: 'loadProjects',
+    value: function loadProjects(query, opts) {
+      query = query || '';
+      if (isObject(query)) {
+        query = '?' + Formio.serialize(query.params);
+      }
+      return Formio.makeStaticRequest(Formio.baseUrl + '/project' + query, 'GET', null, opts);
+    }
+  }, {
+    key: 'getUrlParts',
+    value: function getUrlParts(url, formio) {
+      var base = formio && formio.base ? formio.base : Formio.baseUrl;
+      var regex = '^(http[s]?:\\/\\/)';
+      if (base && url.indexOf(base) === 0) {
+        regex += '(' + base.replace(/^http[s]?:\/\//, '') + ')';
+      } else {
+        regex += '([^/]+)';
+      }
+      regex += '($|\\/.*)';
+      return url.match(new RegExp(regex));
+    }
+  }, {
+    key: 'serialize',
+    value: function serialize(obj) {
+      var str = [];
+      for (var p in obj) {
+        if (obj.hasOwnProperty(p)) {
+          str.push(encodeURIComponent(p) + '=' + encodeURIComponent(obj[p]));
+        }
+      }
+      return str.join('&');
+    }
+  }, {
+    key: 'getRequestArgs',
+    value: function getRequestArgs(formio, type, url, method, data, opts) {
+      method = (method || 'GET').toUpperCase();
+      if (!opts || !isObject(opts)) {
+        opts = {};
+      }
+
+      var requestArgs = {
+        url: url,
+        method: method,
+        data: data || null,
+        opts: opts
+      };
+
+      if (type) {
+        requestArgs.type = type;
+      }
+
+      if (formio) {
+        requestArgs.formio = formio;
+      }
+      return requestArgs;
+    }
+  }, {
+    key: 'makeStaticRequest',
+    value: function makeStaticRequest(url, method, data, opts) {
+      var requestArgs = Formio.getRequestArgs(null, '', url, method, data, opts);
+      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
+        return Formio.pluginGet('staticRequest', requestArgs).then(function (result) {
+          if (isNil(result)) {
+            return Formio.request(url, method, requestArgs.data, requestArgs.opts.header, requestArgs.opts);
+          }
+          return result;
+        });
+      });
+
+      return Formio.pluginAlter('wrapStaticRequestPromise', request, requestArgs);
+    }
+  }, {
+    key: 'makeRequest',
+    value: function makeRequest(formio, type, url, method, data, opts) {
+      if (!formio) {
+        return Formio.makeStaticRequest(url, method, data, opts);
+      }
+
+      var requestArgs = Formio.getRequestArgs(formio, type, url, method, data, opts);
+      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
+        return Formio.pluginGet('request', requestArgs).then(function (result) {
+          if (isNil(result)) {
+            return Formio.request(url, method, requestArgs.data, requestArgs.opts.header, requestArgs.opts);
+          }
+          return result;
+        });
+      });
+
+      return Formio.pluginAlter('wrapRequestPromise', request, requestArgs);
+    }
+  }, {
+    key: 'request',
+    value: function request(url, method, data, header, opts) {
+      if (!url) {
+        return _nativePromiseOnly2.default.reject('No url provided');
+      }
+      method = (method || 'GET').toUpperCase();
+
+      // For reverse compatibility, if they provided the ignoreCache parameter,
+      // then change it back to the options format where that is a parameter.
+      if (isBoolean(opts)) {
+        opts = { ignoreCache: opts };
+      }
+      if (!opts || !isObject(opts)) {
+        opts = {};
+      }
+
+      // Generate a cachekey.
+      var cacheKey = btoa(url);
+
+      // Get the cached promise to save multiple loads.
+      if (!opts.ignoreCache && method === 'GET' && Formio.cache.hasOwnProperty(cacheKey)) {
+        return _nativePromiseOnly2.default.resolve(Formio.cache[cacheKey]);
+      }
+
+      // Set up and fetch request
+      var headers = header || new Headers(opts.headers || {
+        'Accept': 'application/json',
+        'Content-type': 'application/json; charset=UTF-8'
+      });
+      var token = Formio.getToken();
+      if (token && !opts.noToken) {
+        headers.append('x-jwt-token', token);
+      }
+
+      var options = {
+        method: method,
+        headers: headers,
+        mode: 'cors'
+      };
+      if (data) {
+        options.body = JSON.stringify(data);
+      }
+
+      // Allow plugins to alter the options.
+      options = Formio.pluginAlter('requestOptions', options, url);
+
+      var requestToken = options.headers.get('x-jwt-token');
+      return fetch(url, options).then(function (response) {
+        // Allow plugins to respond.
+        response = Formio.pluginAlter('requestResponse', response, Formio);
+
+        if (!response.ok) {
+          if (response.status === 440) {
+            Formio.setToken(null);
+            Formio.events.emit('formio.sessionExpired', response.body);
+          } else if (response.status === 401) {
+            Formio.events.emit('formio.unauthorized', response.body);
+          }
+          // Parse and return the error as a rejected promise to reject this promise
+          return (response.headers.get('content-type').indexOf('application/json') !== -1 ? response.json() : response.text()).then(function (error) {
+            return _nativePromiseOnly2.default.reject(error);
+          });
+        }
+
+        // Handle fetch results
+        var token = response.headers.get('x-jwt-token');
+
+        // In some strange cases, the fetch library will return an x-jwt-token without sending
+        // one to the server. This has even been debugged on the server to verify that no token
+        // was introduced with the request, but the response contains a token. This is an Invalid
+        // case where we do not send an x-jwt-token and get one in return for any GET request.
+        var tokenIntroduced = false;
+        if (method === 'GET' && !requestToken && token && !opts.external && !(url.indexOf('token=') !== -1) && !(url.indexOf('x-jwt-token=') !== -1)) {
+          console.warn('Token was introduced in request.');
+          tokenIntroduced = true;
+        }
+
+        if (response.status >= 200 && response.status < 300 && token && token !== '' && !tokenIntroduced) {
+          Formio.setToken(token);
+        }
+        // 204 is no content. Don't try to .json() it.
+        if (response.status === 204) {
+          return {};
+        }
+
+        var getResult = response.headers.get('content-type').indexOf('application/json') !== -1 ? response.json() : response.text();
+        return getResult.then(function (result) {
+          // Add some content-range metadata to the result here
+          var range = response.headers.get('content-range');
+          if (range && isObject(result)) {
+            range = range.split('/');
+            if (range[0] !== '*') {
+              var skipLimit = range[0].split('-');
+              result.skip = Number(skipLimit[0]);
+              result.limit = skipLimit[1] - skipLimit[0] + 1;
+            }
+            result.serverCount = range[1] === '*' ? range[1] : Number(range[1]);
+          }
+
+          if (!opts.getHeaders) {
+            return result;
+          }
+
+          var headers = {};
+          response.headers.forEach(function (item, key) {
+            headers[key] = item;
+          });
+
+          // Return the result with the headers.
+          return {
+            result: result,
+            headers: headers
+          };
+        });
+      }).then(function (result) {
+        if (opts.getHeaders) {
+          return result;
+        }
+
+        var resultCopy = {};
+
+        // Shallow copy result so modifications don't end up in cache
+        if (Array.isArray(result)) {
+          resultCopy = result.map(_shallowCopy2.default);
+          resultCopy.skip = result.skip;
+          resultCopy.limit = result.limit;
+          resultCopy.serverCount = result.serverCount;
+        } else {
+          resultCopy = (0, _shallowCopy2.default)(result);
+        }
+
+        // Cache the response.
+        if (method === 'GET') {
+          Formio.cache[cacheKey] = resultCopy;
+        }
+
+        return resultCopy;
+      }).catch(function (err) {
+        if (err === 'Bad Token') {
+          Formio.setToken(null);
+          Formio.events.emit('formio.badToken', err);
+        }
+        if (err.message) {
+          err.message = 'Could not connect to API server (' + err.message + ')';
+          err.networkError = true;
+        }
+        return _nativePromiseOnly2.default.reject(err);
+      });
+    }
+  }, {
+    key: 'setToken',
+    value: function setToken(token) {
+      token = token || '';
+      if (token === this.token) {
+        return;
+      }
+      this.token = token;
+      if (!token) {
+        Formio.setUser(null);
+        // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
+        try {
+          return localStorage.removeItem('formioToken');
+        } catch (err) {
+          return _browserCookies2.default.erase('formioToken', { path: '/' });
+        }
+      }
+      // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
+      try {
+        localStorage.setItem('formioToken', token);
+      } catch (err) {
+        _browserCookies2.default.set('formioToken', token, { path: '/' });
+      }
+      return Formio.currentUser(); // Run this so user is updated if null
+    }
+  }, {
+    key: 'getToken',
+    value: function getToken() {
+      if (this.token) {
+        return this.token;
+      }
+      try {
+        this.token = localStorage.getItem('formioToken') || '';
+        return this.token;
+      } catch (e) {
+        this.token = _browserCookies2.default.get('formioToken');
+        return this.token;
+      }
+    }
+  }, {
+    key: 'setUser',
+    value: function setUser(user) {
+      if (!user) {
+        this.setToken(null);
+        // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
+        try {
+          return localStorage.removeItem('formioUser');
+        } catch (err) {
+          return _browserCookies2.default.erase('formioUser', { path: '/' });
+        }
+      }
+      // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
+      try {
+        localStorage.setItem('formioUser', JSON.stringify(user));
+      } catch (err) {
+        _browserCookies2.default.set('formioUser', JSON.stringify(user), { path: '/' });
+      }
+    }
+  }, {
+    key: 'getUser',
+    value: function getUser() {
+      try {
+        return JSON.parse(localStorage.getItem('formioUser') || null);
+      } catch (e) {
+        return JSON.parse(_browserCookies2.default.get('formioUser'));
+      }
+    }
+  }, {
+    key: 'setBaseUrl',
+    value: function setBaseUrl(url) {
+      Formio.baseUrl = url;
+      if (!Formio.projectUrlSet) {
+        Formio.projectUrl = url;
+      }
+    }
+  }, {
+    key: 'getBaseUrl',
+    value: function getBaseUrl() {
+      return Formio.baseUrl;
+    }
+  }, {
+    key: 'setApiUrl',
+    value: function setApiUrl(url) {
+      return Formio.setBaseUrl(url);
+    }
+  }, {
+    key: 'getApiUrl',
+    value: function getApiUrl() {
+      return Formio.getBaseUrl();
+    }
+  }, {
+    key: 'setAppUrl',
+    value: function setAppUrl(url) {
+      console.warn('Formio.setAppUrl() is deprecated. Use Formio.setProjectUrl instead.');
+      Formio.projectUrl = url;
+      Formio.projectUrlSet = true;
+    }
+  }, {
+    key: 'setProjectUrl',
+    value: function setProjectUrl(url) {
+      Formio.projectUrl = url;
+      Formio.projectUrlSet = true;
+    }
+  }, {
+    key: 'getAppUrl',
+    value: function getAppUrl() {
+      console.warn('Formio.getAppUrl() is deprecated. Use Formio.getProjectUrl instead.');
+      return Formio.projectUrl;
+    }
+  }, {
+    key: 'getProjectUrl',
+    value: function getProjectUrl() {
+      return Formio.projectUrl;
+    }
+  }, {
+    key: 'clearCache',
+    value: function clearCache() {
+      Formio.cache = {};
+    }
+  }, {
+    key: 'noop',
+    value: function noop() {}
+  }, {
+    key: 'identity',
+    value: function identity(value) {
+      return value;
+    }
+  }, {
+    key: 'deregisterPlugin',
+    value: function deregisterPlugin(plugin) {
+      var beforeLength = Formio.plugins.length;
+      Formio.plugins = Formio.plugins.filter(function (p) {
+        if (p !== plugin && p.__name !== plugin) {
+          return true;
+        }
+
+        (p.deregister || Formio.noop).call(plugin, Formio);
+        return false;
+      });
+      return beforeLength !== Formio.plugins.length;
+    }
+  }, {
+    key: 'registerPlugin',
+    value: function registerPlugin(plugin, name) {
+      Formio.plugins.push(plugin);
+      Formio.plugins.sort(function (a, b) {
+        return (b.priority || 0) - (a.priority || 0);
+      });
+      plugin.__name = name;
+      (plugin.init || Formio.noop).call(plugin, Formio);
+    }
+  }, {
+    key: 'getPlugin',
+    value: function getPlugin(name) {
+      var _iteratorNormalCompletion = true;
+      var _didIteratorError = false;
+      var _iteratorError = undefined;
+
+      try {
+        for (var _iterator = Formio.plugins[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          var plugin = _step.value;
+
+          if (plugin.__name === name) {
+            return plugin;
+          }
+        }
+      } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && _iterator.return) {
+            _iterator.return();
+          }
+        } finally {
+          if (_didIteratorError) {
+            throw _iteratorError;
+          }
+        }
+      }
+
+      return null;
+    }
+  }, {
+    key: 'pluginWait',
+    value: function pluginWait(pluginFn) {
+      for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
+        args[_key2 - 1] = arguments[_key2];
+      }
+
+      return _nativePromiseOnly2.default.all(Formio.plugins.map(function (plugin) {
+        var _ref;
+
+        return (_ref = plugin[pluginFn] || Formio.noop).call.apply(_ref, [plugin].concat(args));
+      }));
+    }
+  }, {
+    key: 'pluginGet',
+    value: function pluginGet(pluginFn) {
+      for (var _len3 = arguments.length, args = Array(_len3 > 1 ? _len3 - 1 : 0), _key3 = 1; _key3 < _len3; _key3++) {
+        args[_key3 - 1] = arguments[_key3];
+      }
+
+      var callPlugin = function callPlugin(index) {
+        var _ref2;
+
+        var plugin = Formio.plugins[index];
+
+        if (!plugin) {
+          return _nativePromiseOnly2.default.resolve(null);
+        }
+
+        return _nativePromiseOnly2.default.resolve((_ref2 = plugin[pluginFn] || Formio.noop).call.apply(_ref2, [plugin].concat(args))).then(function (result) {
+          if (!isNil(result)) {
+            return result;
+          }
+
+          return callPlugin(index + 1);
+        });
+      };
+      return callPlugin(0);
+    }
+  }, {
+    key: 'pluginAlter',
+    value: function pluginAlter(pluginFn, value) {
+      for (var _len4 = arguments.length, args = Array(_len4 > 2 ? _len4 - 2 : 0), _key4 = 2; _key4 < _len4; _key4++) {
+        args[_key4 - 2] = arguments[_key4];
+      }
+
+      return Formio.plugins.reduce(function (value, plugin) {
+        return (plugin[pluginFn] || Formio.identity).apply(undefined, [value].concat(args));
+      }, value);
+    }
+  }, {
+    key: 'accessInfo',
+    value: function accessInfo(formio) {
+      var projectUrl = formio ? formio.projectUrl : Formio.projectUrl;
+      return Formio.makeRequest(formio, 'accessInfo', projectUrl + '/access');
+    }
+  }, {
+    key: 'currentUser',
+    value: function currentUser(formio, options) {
+      var projectUrl = formio ? formio.projectUrl : Formio.projectUrl || Formio.baseUrl;
+      projectUrl += '/current';
+      var user = this.getUser();
+      if (user) {
+        return Formio.pluginAlter('wrapStaticRequestPromise', _nativePromiseOnly2.default.resolve(user), {
+          url: projectUrl,
+          method: 'GET',
+          options: options
+        });
+      }
+      if ((!options || !options.external) && !Formio.getToken()) {
+        return Formio.pluginAlter('wrapStaticRequestPromise', _nativePromiseOnly2.default.resolve(null), {
+          url: projectUrl,
+          method: 'GET',
+          options: options
+        });
+      }
+      return Formio.makeRequest(formio, 'currentUser', projectUrl, 'GET', null, options).then(function (response) {
+        Formio.setUser(response);
+        return response;
+      });
+    }
+  }, {
+    key: 'logout',
+    value: function logout(formio) {
+      Formio.setToken(null);
+      Formio.setUser(null);
+      Formio.clearCache();
+      var projectUrl = formio ? formio.projectUrl : Formio.baseUrl;
+      return Formio.makeRequest(formio, 'logout', projectUrl + '/logout');
+    }
+  }, {
+    key: 'oAuthCurrentUser',
+    value: function oAuthCurrentUser(formio, token) {
+      return Formio.currentUser(formio, {
+        external: true,
+        headers: {
+          Authorization: 'Bearer ' + token
+        }
+      });
+    }
+  }, {
+    key: 'oktaInit',
+    value: function oktaInit(options) {
+      options = options || {};
+      if ((typeof OktaAuth === 'undefined' ? 'undefined' : _typeof(OktaAuth)) !== undefined) {
+        options.OktaAuth = OktaAuth;
+      }
+
+      if (_typeof(options.OktaAuth) === undefined) {
+        var errorMessage = 'Cannot find OktaAuth. Please include the Okta JavaScript SDK within your application. See https://developer.okta.com/code/javascript/okta_auth_sdk for an example.';
+        console.warn(errorMessage);
+        return _nativePromiseOnly2.default.reject(errorMessage);
+      }
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        var Okta = options.OktaAuth;
+        delete options.OktaAuth;
+        var authClient = new Okta(options);
+        var accessToken = authClient.tokenManager.get('accessToken');
+        if (accessToken) {
+          resolve(Formio.oAuthCurrentUser(options.formio, accessToken.accessToken));
+        } else if (location.hash) {
+          authClient.token.parseFromUrl().then(function (token) {
+            authClient.tokenManager.add('accessToken', token);
+            resolve(Formio.oAuthCurrentUser(options.formio, token.accessToken));
+          }).catch(function (err) {
+            console.warn(err);
+            reject(err);
+          });
+        } else {
+          authClient.token.getWithRedirect({
+            responseType: 'token',
+            scopes: options.scopes
+          });
+          resolve(false);
+        }
+      });
+    }
+  }, {
+    key: 'ssoInit',
+    value: function ssoInit(type, options) {
+      switch (type) {
+        case 'okta':
+          return Formio.oktaInit(options);
+        default:
+          console.warn('Unknown SSO type');
+          return _nativePromiseOnly2.default.reject('Unknown SSO type');
+      }
+    }
+  }, {
+    key: 'requireLibrary',
+    value: function requireLibrary(name, property, src, polling) {
+      if (!Formio.libraries.hasOwnProperty(name)) {
+        Formio.libraries[name] = {};
+        Formio.libraries[name].ready = new _nativePromiseOnly2.default(function (resolve, reject) {
+          Formio.libraries[name].resolve = resolve;
+          Formio.libraries[name].reject = reject;
+        });
+
+        var callbackName = name + 'Callback';
+
+        if (!polling && !window[callbackName]) {
+          window[callbackName] = function () {
+            return Formio.libraries[name].resolve();
+          };
+        }
+
+        // See if the plugin already exists.
+        var plugin = (0, _get3.default)(window, property);
+        if (plugin) {
+          Formio.libraries[name].resolve(plugin);
+        } else {
+          src = Array.isArray(src) ? src : [src];
+          src.forEach(function (lib) {
+            var attrs = {};
+            var elementType = '';
+            if (typeof lib === 'string') {
+              lib = {
+                type: 'script',
+                src: lib
+              };
+            }
+            switch (lib.type) {
+              case 'script':
+                elementType = 'script';
+                attrs = {
+                  src: lib.src,
+                  type: 'text/javascript',
+                  defer: true,
+                  async: true
+                };
+                break;
+              case 'styles':
+                elementType = 'link';
+                attrs = {
+                  href: lib.src,
+                  rel: 'stylesheet'
+                };
+                break;
+            }
+
+            // Add the script to the top page.
+            var script = document.createElement(elementType);
+            for (var attr in attrs) {
+              script.setAttribute(attr, attrs[attr]);
+            }
+            document.getElementsByTagName('head')[0].appendChild(script);
+          });
+
+          // if no callback is provided, then check periodically for the script.
+          if (polling) {
+            var interval = setInterval(function () {
+              var plugin = (0, _get3.default)(window, property);
+              if (plugin) {
+                clearInterval(interval);
+                Formio.libraries[name].resolve(plugin);
+              }
+            }, 200);
+          }
+        }
+      }
+      return Formio.libraries[name].ready;
+    }
+  }, {
+    key: 'libraryReady',
+    value: function libraryReady(name) {
+      if (Formio.libraries.hasOwnProperty(name) && Formio.libraries[name].ready) {
+        return Formio.libraries[name].ready;
+      }
+
+      return _nativePromiseOnly2.default.reject(name + ' library was not required.');
+    }
+  }]);
+
+  return Formio;
+}();
+
+// Define all the static properties.
+
+
+exports.default = Formio;
+Formio.libraries = {};
+Formio.Headers = Headers;
+Formio.baseUrl = 'https://api.form.io';
+Formio.projectUrl = Formio.baseUrl;
+Formio.projectUrlSet = false;
+Formio.plugins = [];
+Formio.cache = {};
+Formio.providers = _providers2.default;
+Formio.events = new _eventemitter.EventEmitter2({
+  wildcard: false,
+  maxListeners: 0
+});
+
+if ((typeof global === 'undefined' ? 'undefined' : _typeof(global)) === 'object' && !global.Formio) {
+  global.Formio = Formio;
+}
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./providers":29,"browser-cookies":26,"eventemitter2":27,"lodash/get":224,"native-promise-only":272,"shallow-copy":347,"whatwg-fetch":353}],29:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _storage = _dereq_('./storage');
+
+var _storage2 = _interopRequireDefault(_storage);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = {
+  storage: _storage2.default
+};
+},{"./storage":32}],30:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _nativePromiseOnly = _dereq_('native-promise-only');
+
+var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var base64 = function base64() {
+  return {
+    title: 'Base64',
+    name: 'base64',
+    uploadFile: function uploadFile(file, fileName) {
+      var _this = this;
+
+      var reader = new FileReader();
+
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        reader.onload = function (event) {
+          var url = event.target.result;
+          resolve({
+            storage: 'base64',
+            name: fileName,
+            url: url,
+            size: file.size,
+            type: file.type,
+            data: url.replace('data:' + file.type + ';base64,', '')
+          });
+        };
+
+        reader.onerror = function () {
+          return reject(_this);
+        };
+
+        reader.readAsDataURL(file);
+      });
+    },
+    downloadFile: function downloadFile(file) {
+      // Return the original as there is nothing to do.
+      return _nativePromiseOnly2.default.resolve(file);
+    }
+  };
+};
+
+base64.title = 'Base64';
+exports.default = base64;
+},{"native-promise-only":272}],31:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _nativePromiseOnly = _dereq_('native-promise-only');
+
+var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var dropbox = function dropbox(formio) {
+  return {
+    uploadFile: function uploadFile(file, fileName, dir, progressCallback) {
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        // Send the file with data.
+        var xhr = new XMLHttpRequest();
+
+        if (typeof progressCallback === 'function') {
+          xhr.upload.onprogress = progressCallback;
+        }
+
+        var fd = new FormData();
+        fd.append('name', fileName);
+        fd.append('dir', dir);
+        fd.append('file', file);
+
+        // Fire on network error.
+        xhr.onerror = function (err) {
+          err.networkError = true;
+          reject(err);
+        };
+
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            var response = JSON.parse(xhr.response);
+            response.storage = 'dropbox';
+            response.size = file.size;
+            response.type = file.type;
+            response.url = response.path_lower;
+            resolve(response);
+          } else {
+            reject(xhr.response || 'Unable to upload file');
+          }
+        };
+
+        xhr.onabort = reject;
+
+        xhr.open('POST', formio.formUrl + '/storage/dropbox');
+        var token = formio.getToken();
+        if (token) {
+          xhr.setRequestHeader('x-jwt-token', token);
+        }
+        xhr.send(fd);
+      });
+    },
+    downloadFile: function downloadFile(file) {
+      var token = formio.getToken();
+      file.url = formio.formUrl + '/storage/dropbox?path_lower=' + file.path_lower + (token ? '&x-jwt-token=' + token : '');
+      return _nativePromiseOnly2.default.resolve(file);
+    }
+  };
+};
+
+dropbox.title = 'Dropbox';
+exports.default = dropbox;
+},{"native-promise-only":272}],32:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _base = _dereq_('./base64');
+
+var _base2 = _interopRequireDefault(_base);
+
+var _dropbox = _dereq_('./dropbox');
+
+var _dropbox2 = _interopRequireDefault(_dropbox);
+
+var _s = _dereq_('./s3');
+
+var _s2 = _interopRequireDefault(_s);
+
+var _url = _dereq_('./url');
+
+var _url2 = _interopRequireDefault(_url);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = {
+  base64: _base2.default,
+  dropbox: _dropbox2.default,
+  s3: _s2.default,
+  url: _url2.default
+};
+},{"./base64":30,"./dropbox":31,"./s3":33,"./url":34}],33:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _nativePromiseOnly = _dereq_('native-promise-only');
+
+var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var s3 = function s3(formio) {
+  return {
+    uploadFile: function uploadFile(file, fileName, dir, progressCallback) {
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        // Send the pre response to sign the upload.
+        var pre = new XMLHttpRequest();
+
+        var prefd = new FormData();
+        prefd.append('name', fileName);
+        prefd.append('size', file.size);
+        prefd.append('type', file.type);
+
+        // This only fires on a network error.
+        pre.onerror = function (err) {
+          err.networkError = true;
+          reject(err);
+        };
+
+        pre.onabort = reject;
+
+        pre.onload = function () {
+          if (pre.status >= 200 && pre.status < 300) {
+            var response = JSON.parse(pre.response);
+
+            // Send the file with data.
+            var xhr = new XMLHttpRequest();
+
+            if (typeof progressCallback === 'function') {
+              xhr.upload.onprogress = progressCallback;
+            }
+
+            response.data.fileName = fileName;
+            response.data.key += dir + fileName;
+
+            var fd = new FormData();
+            for (var key in response.data) {
+              fd.append(key, response.data[key]);
+            }
+            fd.append('file', file);
+
+            // Fire on network error.
+            xhr.onerror = function (err) {
+              err.networkError = true;
+              reject(err);
+            };
+
+            xhr.onload = function () {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve({
+                  storage: 's3',
+                  name: fileName,
+                  bucket: response.bucket,
+                  key: response.data.key,
+                  url: response.url + response.data.key,
+                  acl: response.data.acl,
+                  size: file.size,
+                  type: file.type
+                });
+              } else {
+                reject(xhr.response || 'Unable to upload file');
+              }
+            };
+
+            xhr.onabort = reject;
+
+            xhr.open('POST', response.url);
+
+            xhr.send(fd);
+          } else {
+            reject(pre.response || 'Unable to sign file');
+          }
+        };
+
+        pre.open('POST', formio.formUrl + '/storage/s3');
+
+        pre.setRequestHeader('Accept', 'application/json');
+        pre.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        var token = formio.getToken();
+        if (token) {
+          pre.setRequestHeader('x-jwt-token', token);
+        }
+
+        pre.send(JSON.stringify({
+          name: fileName,
+          size: file.size,
+          type: file.type
+        }));
+      });
+    },
+    downloadFile: function downloadFile(file) {
+      if (file.acl !== 'public-read') {
+        return formio.makeRequest('file', formio.formUrl + '/storage/s3?bucket=' + file.bucket + '&key=' + file.key, 'GET');
+      } else {
+        return _nativePromiseOnly2.default.resolve(file);
+      }
+    }
+  };
+};
+
+s3.title = 'S3';
+exports.default = s3;
+},{"native-promise-only":272}],34:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _nativePromiseOnly = _dereq_('native-promise-only');
+
+var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var url = function url(formio) {
+  return {
+    title: 'Url',
+    name: 'url',
+    uploadFile: function uploadFile(file, fileName, dir, progressCallback, url) {
+      return new _nativePromiseOnly2.default(function (resolve, reject) {
+        var data = {
+          dir: dir,
+          name: fileName,
+          file: file
+        };
+
+        // Send the file with data.
+        var xhr = new XMLHttpRequest();
+
+        if (typeof progressCallback === 'function') {
+          xhr.upload.onprogress = progressCallback;
+        }
+
+        var fd = new FormData();
+        for (var key in data) {
+          fd.append(key, data[key]);
+        }
+
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            // Need to test if xhr.response is decoded or not.
+            var respData = {};
+            try {
+              respData = typeof xhr.response === 'string' ? JSON.parse(xhr.response) : {};
+              respData = respData && respData.data ? respData.data : respData;
+            } catch (err) {
+              respData = {};
+            }
+
+            var _url = respData.hasOwnProperty('url') ? respData.url : xhr.responseURL + '/' + fileName;
+            resolve({
+              storage: 'url',
+              name: fileName,
+              url: _url,
+              size: file.size,
+              type: file.type,
+              data: respData
+            });
+          } else {
+            reject(xhr.response || 'Unable to upload file');
+          }
+        };
+
+        // Fire on network error.
+        xhr.onerror = function () {
+          return reject(xhr);
+        };
+
+        xhr.onabort = function () {
+          return reject(xhr);
+        };
+
+        xhr.open('POST', url);
+        var token = formio.getToken();
+        if (token) {
+          xhr.setRequestHeader('x-jwt-token', token);
+        }
+        xhr.send(fd);
+      });
+    },
+    downloadFile: function downloadFile(file) {
+      // Return the original as there is nothing to do.
+      return _nativePromiseOnly2.default.resolve(file);
+    }
+  };
+};
+
+url.title = 'Url';
+exports.default = url;
+},{"native-promise-only":272}],35:[function(_dereq_,module,exports){
 (function (global){
 'use strict';
 
@@ -50251,7 +52446,7 @@ if ((typeof global === 'undefined' ? 'undefined' : _typeof(global)) === 'object'
 }
 exports.default = FormioUtils;
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./utils":29}],28:[function(_dereq_,module,exports){
+},{"./utils":37}],36:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -50280,7 +52475,7 @@ var lodashOperators = exports.lodashOperators = [
 'camelCase', 'capitalize', 'deburr', 'endsWith', 'escape', 'escapeRegExp', 'kebabCase', 'lowerCase', 'lowerFirst', 'pad', 'padEnd', 'padStart', 'parseInt', 'repeat', 'replace', 'snakeCase', 'split', 'startCase', 'startsWith', 'toLower', 'toUpper', 'trim', 'trimEnd', 'trimStart', 'truncate', 'unescape', 'upperCase', 'upperFirst', 'words',
 // Util
 'cond', 'conforms', 'constant', 'defaultTo', 'flow', 'flowRight', 'identity', 'iteratee', 'matches', 'matchesProperty', 'method', 'methodOf', 'nthArg', 'over', 'overEvery', 'overSome', 'property', 'propertyOf', 'range', 'rangeRight', 'stubArray', 'stubFalse', 'stubObject', 'stubString', 'stubTrue', 'times', 'toPath', 'uniqueId'];
-},{}],29:[function(_dereq_,module,exports){
+},{}],37:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -50327,6 +52522,7 @@ exports.matchInputMask = matchInputMask;
 exports.getNumberSeparators = getNumberSeparators;
 exports.getNumberDecimalLimit = getNumberDecimalLimit;
 exports.getCurrencyAffixes = getCurrencyAffixes;
+exports.fieldData = fieldData;
 
 var _lodash = _dereq_('lodash');
 
@@ -50725,7 +52921,7 @@ function checkCalculated(component, submission, rowData) {
   // Process calculated value stuff if present.
   if (component.calculateValue) {
     _lodash2.default.set(rowData, component.key, evaluate(component.calculateValue, {
-      value: [],
+      value: undefined,
       data: submission ? submission.data : rowData,
       row: rowData,
       util: this,
@@ -50780,7 +52976,7 @@ function checkCustomConditional(component, custom, row, data, form, variable, on
   if (typeof custom === 'string') {
     custom = 'var ' + variable + ' = true; ' + custom + '; return ' + variable + ';';
   }
-  var value = evaluate(custom, { component: component, row: row, data: data, form: form, instance: instance });
+  var value = instance && instance.evaluate ? instance.evaluate(custom, { row: row, data: data, form: form }) : evaluate(custom, { row: row, data: data, form: form });
   if (value === null) {
     return onError;
   }
@@ -50819,7 +53015,7 @@ function checkCondition(component, row, data, form, instance) {
   } else if (component.conditional && component.conditional.when) {
     return checkSimpleConditional(component, component.conditional, row, data, true);
   } else if (component.conditional && component.conditional.json) {
-    return checkJsonConditional(component, component.conditional.json, row, data, form);
+    return checkJsonConditional(component, component.conditional.json, row, data, form, instance);
   }
 
   // Default to show.
@@ -50848,7 +53044,7 @@ function checkTrigger(component, trigger, row, data, form, instance) {
   return false;
 }
 
-function setActionProperty(component, action, row, data, result) {
+function setActionProperty(component, action, row, data, result, instance) {
   switch (action.property.type) {
     case 'boolean':
       if (_lodash2.default.get(component, action.property.value, false).toString() !== action.state.toString()) {
@@ -50857,12 +53053,13 @@ function setActionProperty(component, action, row, data, result) {
       break;
     case 'string':
       {
-        var newValue = interpolate(action.text, {
+        var evalData = {
           data: data,
           row: row,
           component: component,
           result: result
-        });
+        };
+        var newValue = instance && instance.interpolate ? instance.interpolate(action.text, evalData) : interpolate(action.text, evalData);
         if (newValue !== _lodash2.default.get(component, action.property.value, '')) {
           _lodash2.default.set(component, action.property.value, newValue);
         }
@@ -50957,15 +53154,32 @@ function getDateSetting(date) {
     return null;
   }
 
-  var dateSetting = (0, _moment2.default)(date);
-  if (dateSetting.isValid()) {
+  if (date instanceof Date) {
+    return date;
+  } else if (typeof date.toDate === 'function') {
+    return date.isValid() ? date.toDate() : null;
+  }
+
+  var dateSetting = typeof date !== 'string' || date.indexOf('moment(') === -1 ? (0, _moment2.default)(date) : null;
+  if (dateSetting && dateSetting.isValid()) {
     return dateSetting.toDate();
   }
 
+  dateSetting = null;
   try {
     var value = new Function('moment', 'return ' + date + ';')(_moment2.default);
-    dateSetting = (0, _moment2.default)(value);
+    if (typeof value === 'string') {
+      dateSetting = (0, _moment2.default)(value);
+    } else if (typeof value.toDate === 'function') {
+      dateSetting = (0, _moment2.default)(value.toDate().toUTCString());
+    } else if (value instanceof Date) {
+      dateSetting = (0, _moment2.default)(value);
+    }
   } catch (e) {
+    return null;
+  }
+
+  if (!dateSetting) {
     return null;
   }
 
@@ -51135,7 +53349,56 @@ function getCurrencyAffixes(_ref) {
     suffix: parts[2] || ''
   };
 }
-},{"./jsonlogic/operators":28,"json-logic-js":31,"lodash":242,"moment":263}],30:[function(_dereq_,module,exports){
+
+/**
+ * Fetch the field data provided a component.
+ *
+ * @param data
+ * @param component
+ * @return {*}
+ */
+function fieldData(data, component) {
+  if (!data) {
+    return '';
+  }
+  if (!component || !component.key) {
+    return data;
+  }
+  if (component.key.indexOf('.') !== -1) {
+    var value = data;
+    var parts = component.key.split('.');
+    var key = '';
+    for (var i = 0; i < parts.length; i++) {
+      key = parts[i];
+
+      // Handle nested resources
+      if (value.hasOwnProperty('_id')) {
+        value = value.data;
+      }
+
+      // Return if the key is not found on the value.
+      if (!value.hasOwnProperty(key)) {
+        return;
+      }
+
+      // Convert old single field data in submissions to multiple
+      if (key === parts[parts.length - 1] && component.multiple && !Array.isArray(value[key])) {
+        value[key] = [value[key]];
+      }
+
+      // Set the value of this key.
+      value = value[key];
+    }
+    return value;
+  } else {
+    // Convert old single field data in submissions to multiple
+    if (component.multiple && !Array.isArray(data[component.key])) {
+      data[component.key] = [data[component.key]];
+    }
+    return data[component.key];
+  }
+}
+},{"./jsonlogic/operators":36,"json-logic-js":39,"lodash":250,"moment":271}],38:[function(_dereq_,module,exports){
 /*!
  * jQuery JavaScript Library v3.3.1
  * https://jquery.com/
@@ -61501,7 +63764,7 @@ if ( !noGlobal ) {
 return jQuery;
 } );
 
-},{}],31:[function(_dereq_,module,exports){
+},{}],39:[function(_dereq_,module,exports){
 /* globals define,module */
 /*
 Using a Universal Module Loader that should be browser, require, and AMD friendly
@@ -61967,7 +64230,7 @@ http://ricostacruz.com/cheatsheets/umdjs.html
   return jsonLogic;
 }));
 
-},{}],32:[function(_dereq_,module,exports){
+},{}],40:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative'),
     root = _dereq_('./_root');
 
@@ -61976,7 +64239,7 @@ var DataView = getNative(root, 'DataView');
 
 module.exports = DataView;
 
-},{"./_getNative":139,"./_root":185}],33:[function(_dereq_,module,exports){
+},{"./_getNative":147,"./_root":193}],41:[function(_dereq_,module,exports){
 var hashClear = _dereq_('./_hashClear'),
     hashDelete = _dereq_('./_hashDelete'),
     hashGet = _dereq_('./_hashGet'),
@@ -62010,7 +64273,7 @@ Hash.prototype.set = hashSet;
 
 module.exports = Hash;
 
-},{"./_hashClear":149,"./_hashDelete":150,"./_hashGet":151,"./_hashHas":152,"./_hashSet":153}],34:[function(_dereq_,module,exports){
+},{"./_hashClear":157,"./_hashDelete":158,"./_hashGet":159,"./_hashHas":160,"./_hashSet":161}],42:[function(_dereq_,module,exports){
 var listCacheClear = _dereq_('./_listCacheClear'),
     listCacheDelete = _dereq_('./_listCacheDelete'),
     listCacheGet = _dereq_('./_listCacheGet'),
@@ -62044,7 +64307,7 @@ ListCache.prototype.set = listCacheSet;
 
 module.exports = ListCache;
 
-},{"./_listCacheClear":165,"./_listCacheDelete":166,"./_listCacheGet":167,"./_listCacheHas":168,"./_listCacheSet":169}],35:[function(_dereq_,module,exports){
+},{"./_listCacheClear":173,"./_listCacheDelete":174,"./_listCacheGet":175,"./_listCacheHas":176,"./_listCacheSet":177}],43:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative'),
     root = _dereq_('./_root');
 
@@ -62053,7 +64316,7 @@ var Map = getNative(root, 'Map');
 
 module.exports = Map;
 
-},{"./_getNative":139,"./_root":185}],36:[function(_dereq_,module,exports){
+},{"./_getNative":147,"./_root":193}],44:[function(_dereq_,module,exports){
 var mapCacheClear = _dereq_('./_mapCacheClear'),
     mapCacheDelete = _dereq_('./_mapCacheDelete'),
     mapCacheGet = _dereq_('./_mapCacheGet'),
@@ -62087,7 +64350,7 @@ MapCache.prototype.set = mapCacheSet;
 
 module.exports = MapCache;
 
-},{"./_mapCacheClear":170,"./_mapCacheDelete":171,"./_mapCacheGet":172,"./_mapCacheHas":173,"./_mapCacheSet":174}],37:[function(_dereq_,module,exports){
+},{"./_mapCacheClear":178,"./_mapCacheDelete":179,"./_mapCacheGet":180,"./_mapCacheHas":181,"./_mapCacheSet":182}],45:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative'),
     root = _dereq_('./_root');
 
@@ -62096,7 +64359,7 @@ var Promise = getNative(root, 'Promise');
 
 module.exports = Promise;
 
-},{"./_getNative":139,"./_root":185}],38:[function(_dereq_,module,exports){
+},{"./_getNative":147,"./_root":193}],46:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative'),
     root = _dereq_('./_root');
 
@@ -62105,7 +64368,7 @@ var Set = getNative(root, 'Set');
 
 module.exports = Set;
 
-},{"./_getNative":139,"./_root":185}],39:[function(_dereq_,module,exports){
+},{"./_getNative":147,"./_root":193}],47:[function(_dereq_,module,exports){
 var MapCache = _dereq_('./_MapCache'),
     setCacheAdd = _dereq_('./_setCacheAdd'),
     setCacheHas = _dereq_('./_setCacheHas');
@@ -62134,7 +64397,7 @@ SetCache.prototype.has = setCacheHas;
 
 module.exports = SetCache;
 
-},{"./_MapCache":36,"./_setCacheAdd":187,"./_setCacheHas":188}],40:[function(_dereq_,module,exports){
+},{"./_MapCache":44,"./_setCacheAdd":195,"./_setCacheHas":196}],48:[function(_dereq_,module,exports){
 var ListCache = _dereq_('./_ListCache'),
     stackClear = _dereq_('./_stackClear'),
     stackDelete = _dereq_('./_stackDelete'),
@@ -62163,7 +64426,7 @@ Stack.prototype.set = stackSet;
 
 module.exports = Stack;
 
-},{"./_ListCache":34,"./_stackClear":192,"./_stackDelete":193,"./_stackGet":194,"./_stackHas":195,"./_stackSet":196}],41:[function(_dereq_,module,exports){
+},{"./_ListCache":42,"./_stackClear":200,"./_stackDelete":201,"./_stackGet":202,"./_stackHas":203,"./_stackSet":204}],49:[function(_dereq_,module,exports){
 var root = _dereq_('./_root');
 
 /** Built-in value references. */
@@ -62171,7 +64434,7 @@ var Symbol = root.Symbol;
 
 module.exports = Symbol;
 
-},{"./_root":185}],42:[function(_dereq_,module,exports){
+},{"./_root":193}],50:[function(_dereq_,module,exports){
 var root = _dereq_('./_root');
 
 /** Built-in value references. */
@@ -62179,7 +64442,7 @@ var Uint8Array = root.Uint8Array;
 
 module.exports = Uint8Array;
 
-},{"./_root":185}],43:[function(_dereq_,module,exports){
+},{"./_root":193}],51:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative'),
     root = _dereq_('./_root');
 
@@ -62188,7 +64451,7 @@ var WeakMap = getNative(root, 'WeakMap');
 
 module.exports = WeakMap;
 
-},{"./_getNative":139,"./_root":185}],44:[function(_dereq_,module,exports){
+},{"./_getNative":147,"./_root":193}],52:[function(_dereq_,module,exports){
 /**
  * A faster alternative to `Function#apply`, this function invokes `func`
  * with the `this` binding of `thisArg` and the arguments of `args`.
@@ -62211,7 +64474,7 @@ function apply(func, thisArg, args) {
 
 module.exports = apply;
 
-},{}],45:[function(_dereq_,module,exports){
+},{}],53:[function(_dereq_,module,exports){
 /**
  * A specialized version of `baseAggregator` for arrays.
  *
@@ -62235,7 +64498,7 @@ function arrayAggregator(array, setter, iteratee, accumulator) {
 
 module.exports = arrayAggregator;
 
-},{}],46:[function(_dereq_,module,exports){
+},{}],54:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.forEach` for arrays without support for
  * iteratee shorthands.
@@ -62259,7 +64522,7 @@ function arrayEach(array, iteratee) {
 
 module.exports = arrayEach;
 
-},{}],47:[function(_dereq_,module,exports){
+},{}],55:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.filter` for arrays without support for
  * iteratee shorthands.
@@ -62286,7 +64549,7 @@ function arrayFilter(array, predicate) {
 
 module.exports = arrayFilter;
 
-},{}],48:[function(_dereq_,module,exports){
+},{}],56:[function(_dereq_,module,exports){
 var baseIndexOf = _dereq_('./_baseIndexOf');
 
 /**
@@ -62305,7 +64568,7 @@ function arrayIncludes(array, value) {
 
 module.exports = arrayIncludes;
 
-},{"./_baseIndexOf":77}],49:[function(_dereq_,module,exports){
+},{"./_baseIndexOf":85}],57:[function(_dereq_,module,exports){
 /**
  * This function is like `arrayIncludes` except that it accepts a comparator.
  *
@@ -62329,7 +64592,7 @@ function arrayIncludesWith(array, value, comparator) {
 
 module.exports = arrayIncludesWith;
 
-},{}],50:[function(_dereq_,module,exports){
+},{}],58:[function(_dereq_,module,exports){
 var baseTimes = _dereq_('./_baseTimes'),
     isArguments = _dereq_('./isArguments'),
     isArray = _dereq_('./isArray'),
@@ -62380,7 +64643,7 @@ function arrayLikeKeys(value, inherited) {
 
 module.exports = arrayLikeKeys;
 
-},{"./_baseTimes":104,"./_isIndex":158,"./isArguments":220,"./isArray":221,"./isBuffer":224,"./isTypedArray":239}],51:[function(_dereq_,module,exports){
+},{"./_baseTimes":112,"./_isIndex":166,"./isArguments":228,"./isArray":229,"./isBuffer":232,"./isTypedArray":247}],59:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.map` for arrays without support for iteratee
  * shorthands.
@@ -62403,7 +64666,7 @@ function arrayMap(array, iteratee) {
 
 module.exports = arrayMap;
 
-},{}],52:[function(_dereq_,module,exports){
+},{}],60:[function(_dereq_,module,exports){
 /**
  * Appends the elements of `values` to `array`.
  *
@@ -62425,7 +64688,7 @@ function arrayPush(array, values) {
 
 module.exports = arrayPush;
 
-},{}],53:[function(_dereq_,module,exports){
+},{}],61:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.reduce` for arrays without support for
  * iteratee shorthands.
@@ -62453,7 +64716,7 @@ function arrayReduce(array, iteratee, accumulator, initAccum) {
 
 module.exports = arrayReduce;
 
-},{}],54:[function(_dereq_,module,exports){
+},{}],62:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.some` for arrays without support for iteratee
  * shorthands.
@@ -62478,7 +64741,7 @@ function arraySome(array, predicate) {
 
 module.exports = arraySome;
 
-},{}],55:[function(_dereq_,module,exports){
+},{}],63:[function(_dereq_,module,exports){
 /**
  * Converts an ASCII `string` to an array.
  *
@@ -62492,7 +64755,7 @@ function asciiToArray(string) {
 
 module.exports = asciiToArray;
 
-},{}],56:[function(_dereq_,module,exports){
+},{}],64:[function(_dereq_,module,exports){
 /** Used to match words composed of alphanumeric characters. */
 var reAsciiWord = /[^\x00-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]+/g;
 
@@ -62509,7 +64772,7 @@ function asciiWords(string) {
 
 module.exports = asciiWords;
 
-},{}],57:[function(_dereq_,module,exports){
+},{}],65:[function(_dereq_,module,exports){
 var baseAssignValue = _dereq_('./_baseAssignValue'),
     eq = _dereq_('./eq');
 
@@ -62531,7 +64794,7 @@ function assignMergeValue(object, key, value) {
 
 module.exports = assignMergeValue;
 
-},{"./_baseAssignValue":63,"./eq":213}],58:[function(_dereq_,module,exports){
+},{"./_baseAssignValue":71,"./eq":221}],66:[function(_dereq_,module,exports){
 var baseAssignValue = _dereq_('./_baseAssignValue'),
     eq = _dereq_('./eq');
 
@@ -62561,7 +64824,7 @@ function assignValue(object, key, value) {
 
 module.exports = assignValue;
 
-},{"./_baseAssignValue":63,"./eq":213}],59:[function(_dereq_,module,exports){
+},{"./_baseAssignValue":71,"./eq":221}],67:[function(_dereq_,module,exports){
 var eq = _dereq_('./eq');
 
 /**
@@ -62584,7 +64847,7 @@ function assocIndexOf(array, key) {
 
 module.exports = assocIndexOf;
 
-},{"./eq":213}],60:[function(_dereq_,module,exports){
+},{"./eq":221}],68:[function(_dereq_,module,exports){
 var baseEach = _dereq_('./_baseEach');
 
 /**
@@ -62607,7 +64870,7 @@ function baseAggregator(collection, setter, iteratee, accumulator) {
 
 module.exports = baseAggregator;
 
-},{"./_baseEach":67}],61:[function(_dereq_,module,exports){
+},{"./_baseEach":75}],69:[function(_dereq_,module,exports){
 var copyObject = _dereq_('./_copyObject'),
     keys = _dereq_('./keys');
 
@@ -62626,7 +64889,7 @@ function baseAssign(object, source) {
 
 module.exports = baseAssign;
 
-},{"./_copyObject":118,"./keys":240}],62:[function(_dereq_,module,exports){
+},{"./_copyObject":126,"./keys":248}],70:[function(_dereq_,module,exports){
 var copyObject = _dereq_('./_copyObject'),
     keysIn = _dereq_('./keysIn');
 
@@ -62645,7 +64908,7 @@ function baseAssignIn(object, source) {
 
 module.exports = baseAssignIn;
 
-},{"./_copyObject":118,"./keysIn":241}],63:[function(_dereq_,module,exports){
+},{"./_copyObject":126,"./keysIn":249}],71:[function(_dereq_,module,exports){
 var defineProperty = _dereq_('./_defineProperty');
 
 /**
@@ -62672,7 +64935,7 @@ function baseAssignValue(object, key, value) {
 
 module.exports = baseAssignValue;
 
-},{"./_defineProperty":130}],64:[function(_dereq_,module,exports){
+},{"./_defineProperty":138}],72:[function(_dereq_,module,exports){
 var Stack = _dereq_('./_Stack'),
     arrayEach = _dereq_('./_arrayEach'),
     assignValue = _dereq_('./_assignValue'),
@@ -62845,7 +65108,7 @@ function baseClone(value, bitmask, customizer, key, object, stack) {
 
 module.exports = baseClone;
 
-},{"./_Stack":40,"./_arrayEach":46,"./_assignValue":58,"./_baseAssign":61,"./_baseAssignIn":62,"./_cloneBuffer":112,"./_copyArray":117,"./_copySymbols":119,"./_copySymbolsIn":120,"./_getAllKeys":135,"./_getAllKeysIn":136,"./_getTag":144,"./_initCloneArray":154,"./_initCloneByTag":155,"./_initCloneObject":156,"./isArray":221,"./isBuffer":224,"./isMap":230,"./isObject":234,"./isSet":237,"./keys":240}],65:[function(_dereq_,module,exports){
+},{"./_Stack":48,"./_arrayEach":54,"./_assignValue":66,"./_baseAssign":69,"./_baseAssignIn":70,"./_cloneBuffer":120,"./_copyArray":125,"./_copySymbols":127,"./_copySymbolsIn":128,"./_getAllKeys":143,"./_getAllKeysIn":144,"./_getTag":152,"./_initCloneArray":162,"./_initCloneByTag":163,"./_initCloneObject":164,"./isArray":229,"./isBuffer":232,"./isMap":238,"./isObject":242,"./isSet":245,"./keys":248}],73:[function(_dereq_,module,exports){
 var isObject = _dereq_('./isObject');
 
 /** Built-in value references. */
@@ -62877,7 +65140,7 @@ var baseCreate = (function() {
 
 module.exports = baseCreate;
 
-},{"./isObject":234}],66:[function(_dereq_,module,exports){
+},{"./isObject":242}],74:[function(_dereq_,module,exports){
 var SetCache = _dereq_('./_SetCache'),
     arrayIncludes = _dereq_('./_arrayIncludes'),
     arrayIncludesWith = _dereq_('./_arrayIncludesWith'),
@@ -62946,7 +65209,7 @@ function baseDifference(array, values, iteratee, comparator) {
 
 module.exports = baseDifference;
 
-},{"./_SetCache":39,"./_arrayIncludes":48,"./_arrayIncludesWith":49,"./_arrayMap":51,"./_baseUnary":106,"./_cacheHas":107}],67:[function(_dereq_,module,exports){
+},{"./_SetCache":47,"./_arrayIncludes":56,"./_arrayIncludesWith":57,"./_arrayMap":59,"./_baseUnary":114,"./_cacheHas":115}],75:[function(_dereq_,module,exports){
 var baseForOwn = _dereq_('./_baseForOwn'),
     createBaseEach = _dereq_('./_createBaseEach');
 
@@ -62962,7 +65225,7 @@ var baseEach = createBaseEach(baseForOwn);
 
 module.exports = baseEach;
 
-},{"./_baseForOwn":72,"./_createBaseEach":124}],68:[function(_dereq_,module,exports){
+},{"./_baseForOwn":80,"./_createBaseEach":132}],76:[function(_dereq_,module,exports){
 var baseEach = _dereq_('./_baseEach');
 
 /**
@@ -62985,7 +65248,7 @@ function baseFilter(collection, predicate) {
 
 module.exports = baseFilter;
 
-},{"./_baseEach":67}],69:[function(_dereq_,module,exports){
+},{"./_baseEach":75}],77:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.findIndex` and `_.findLastIndex` without
  * support for iteratee shorthands.
@@ -63011,7 +65274,7 @@ function baseFindIndex(array, predicate, fromIndex, fromRight) {
 
 module.exports = baseFindIndex;
 
-},{}],70:[function(_dereq_,module,exports){
+},{}],78:[function(_dereq_,module,exports){
 var arrayPush = _dereq_('./_arrayPush'),
     isFlattenable = _dereq_('./_isFlattenable');
 
@@ -63051,7 +65314,7 @@ function baseFlatten(array, depth, predicate, isStrict, result) {
 
 module.exports = baseFlatten;
 
-},{"./_arrayPush":52,"./_isFlattenable":157}],71:[function(_dereq_,module,exports){
+},{"./_arrayPush":60,"./_isFlattenable":165}],79:[function(_dereq_,module,exports){
 var createBaseFor = _dereq_('./_createBaseFor');
 
 /**
@@ -63069,7 +65332,7 @@ var baseFor = createBaseFor();
 
 module.exports = baseFor;
 
-},{"./_createBaseFor":125}],72:[function(_dereq_,module,exports){
+},{"./_createBaseFor":133}],80:[function(_dereq_,module,exports){
 var baseFor = _dereq_('./_baseFor'),
     keys = _dereq_('./keys');
 
@@ -63087,7 +65350,7 @@ function baseForOwn(object, iteratee) {
 
 module.exports = baseForOwn;
 
-},{"./_baseFor":71,"./keys":240}],73:[function(_dereq_,module,exports){
+},{"./_baseFor":79,"./keys":248}],81:[function(_dereq_,module,exports){
 var castPath = _dereq_('./_castPath'),
     toKey = _dereq_('./_toKey');
 
@@ -63113,7 +65376,7 @@ function baseGet(object, path) {
 
 module.exports = baseGet;
 
-},{"./_castPath":109,"./_toKey":200}],74:[function(_dereq_,module,exports){
+},{"./_castPath":117,"./_toKey":208}],82:[function(_dereq_,module,exports){
 var arrayPush = _dereq_('./_arrayPush'),
     isArray = _dereq_('./isArray');
 
@@ -63135,7 +65398,7 @@ function baseGetAllKeys(object, keysFunc, symbolsFunc) {
 
 module.exports = baseGetAllKeys;
 
-},{"./_arrayPush":52,"./isArray":221}],75:[function(_dereq_,module,exports){
+},{"./_arrayPush":60,"./isArray":229}],83:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol'),
     getRawTag = _dereq_('./_getRawTag'),
     objectToString = _dereq_('./_objectToString');
@@ -63165,7 +65428,7 @@ function baseGetTag(value) {
 
 module.exports = baseGetTag;
 
-},{"./_Symbol":41,"./_getRawTag":141,"./_objectToString":182}],76:[function(_dereq_,module,exports){
+},{"./_Symbol":49,"./_getRawTag":149,"./_objectToString":190}],84:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.hasIn` without support for deep paths.
  *
@@ -63180,7 +65443,7 @@ function baseHasIn(object, key) {
 
 module.exports = baseHasIn;
 
-},{}],77:[function(_dereq_,module,exports){
+},{}],85:[function(_dereq_,module,exports){
 var baseFindIndex = _dereq_('./_baseFindIndex'),
     baseIsNaN = _dereq_('./_baseIsNaN'),
     strictIndexOf = _dereq_('./_strictIndexOf');
@@ -63202,7 +65465,7 @@ function baseIndexOf(array, value, fromIndex) {
 
 module.exports = baseIndexOf;
 
-},{"./_baseFindIndex":69,"./_baseIsNaN":83,"./_strictIndexOf":197}],78:[function(_dereq_,module,exports){
+},{"./_baseFindIndex":77,"./_baseIsNaN":91,"./_strictIndexOf":205}],86:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -63222,7 +65485,7 @@ function baseIsArguments(value) {
 
 module.exports = baseIsArguments;
 
-},{"./_baseGetTag":75,"./isObjectLike":235}],79:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./isObjectLike":243}],87:[function(_dereq_,module,exports){
 var baseIsEqualDeep = _dereq_('./_baseIsEqualDeep'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -63252,7 +65515,7 @@ function baseIsEqual(value, other, bitmask, customizer, stack) {
 
 module.exports = baseIsEqual;
 
-},{"./_baseIsEqualDeep":80,"./isObjectLike":235}],80:[function(_dereq_,module,exports){
+},{"./_baseIsEqualDeep":88,"./isObjectLike":243}],88:[function(_dereq_,module,exports){
 var Stack = _dereq_('./_Stack'),
     equalArrays = _dereq_('./_equalArrays'),
     equalByTag = _dereq_('./_equalByTag'),
@@ -63337,7 +65600,7 @@ function baseIsEqualDeep(object, other, bitmask, customizer, equalFunc, stack) {
 
 module.exports = baseIsEqualDeep;
 
-},{"./_Stack":40,"./_equalArrays":131,"./_equalByTag":132,"./_equalObjects":133,"./_getTag":144,"./isArray":221,"./isBuffer":224,"./isTypedArray":239}],81:[function(_dereq_,module,exports){
+},{"./_Stack":48,"./_equalArrays":139,"./_equalByTag":140,"./_equalObjects":141,"./_getTag":152,"./isArray":229,"./isBuffer":232,"./isTypedArray":247}],89:[function(_dereq_,module,exports){
 var getTag = _dereq_('./_getTag'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -63357,7 +65620,7 @@ function baseIsMap(value) {
 
 module.exports = baseIsMap;
 
-},{"./_getTag":144,"./isObjectLike":235}],82:[function(_dereq_,module,exports){
+},{"./_getTag":152,"./isObjectLike":243}],90:[function(_dereq_,module,exports){
 var Stack = _dereq_('./_Stack'),
     baseIsEqual = _dereq_('./_baseIsEqual');
 
@@ -63421,7 +65684,7 @@ function baseIsMatch(object, source, matchData, customizer) {
 
 module.exports = baseIsMatch;
 
-},{"./_Stack":40,"./_baseIsEqual":79}],83:[function(_dereq_,module,exports){
+},{"./_Stack":48,"./_baseIsEqual":87}],91:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.isNaN` without support for number objects.
  *
@@ -63435,7 +65698,7 @@ function baseIsNaN(value) {
 
 module.exports = baseIsNaN;
 
-},{}],84:[function(_dereq_,module,exports){
+},{}],92:[function(_dereq_,module,exports){
 var isFunction = _dereq_('./isFunction'),
     isMasked = _dereq_('./_isMasked'),
     isObject = _dereq_('./isObject'),
@@ -63484,7 +65747,7 @@ function baseIsNative(value) {
 
 module.exports = baseIsNative;
 
-},{"./_isMasked":162,"./_toSource":201,"./isFunction":228,"./isObject":234}],85:[function(_dereq_,module,exports){
+},{"./_isMasked":170,"./_toSource":209,"./isFunction":236,"./isObject":242}],93:[function(_dereq_,module,exports){
 var getTag = _dereq_('./_getTag'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -63504,7 +65767,7 @@ function baseIsSet(value) {
 
 module.exports = baseIsSet;
 
-},{"./_getTag":144,"./isObjectLike":235}],86:[function(_dereq_,module,exports){
+},{"./_getTag":152,"./isObjectLike":243}],94:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     isLength = _dereq_('./isLength'),
     isObjectLike = _dereq_('./isObjectLike');
@@ -63566,7 +65829,7 @@ function baseIsTypedArray(value) {
 
 module.exports = baseIsTypedArray;
 
-},{"./_baseGetTag":75,"./isLength":229,"./isObjectLike":235}],87:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./isLength":237,"./isObjectLike":243}],95:[function(_dereq_,module,exports){
 var baseMatches = _dereq_('./_baseMatches'),
     baseMatchesProperty = _dereq_('./_baseMatchesProperty'),
     identity = _dereq_('./identity'),
@@ -63599,7 +65862,7 @@ function baseIteratee(value) {
 
 module.exports = baseIteratee;
 
-},{"./_baseMatches":91,"./_baseMatchesProperty":92,"./identity":219,"./isArray":221,"./property":250}],88:[function(_dereq_,module,exports){
+},{"./_baseMatches":99,"./_baseMatchesProperty":100,"./identity":227,"./isArray":229,"./property":258}],96:[function(_dereq_,module,exports){
 var isPrototype = _dereq_('./_isPrototype'),
     nativeKeys = _dereq_('./_nativeKeys');
 
@@ -63631,7 +65894,7 @@ function baseKeys(object) {
 
 module.exports = baseKeys;
 
-},{"./_isPrototype":163,"./_nativeKeys":179}],89:[function(_dereq_,module,exports){
+},{"./_isPrototype":171,"./_nativeKeys":187}],97:[function(_dereq_,module,exports){
 var isObject = _dereq_('./isObject'),
     isPrototype = _dereq_('./_isPrototype'),
     nativeKeysIn = _dereq_('./_nativeKeysIn');
@@ -63666,7 +65929,7 @@ function baseKeysIn(object) {
 
 module.exports = baseKeysIn;
 
-},{"./_isPrototype":163,"./_nativeKeysIn":180,"./isObject":234}],90:[function(_dereq_,module,exports){
+},{"./_isPrototype":171,"./_nativeKeysIn":188,"./isObject":242}],98:[function(_dereq_,module,exports){
 var baseEach = _dereq_('./_baseEach'),
     isArrayLike = _dereq_('./isArrayLike');
 
@@ -63690,7 +65953,7 @@ function baseMap(collection, iteratee) {
 
 module.exports = baseMap;
 
-},{"./_baseEach":67,"./isArrayLike":222}],91:[function(_dereq_,module,exports){
+},{"./_baseEach":75,"./isArrayLike":230}],99:[function(_dereq_,module,exports){
 var baseIsMatch = _dereq_('./_baseIsMatch'),
     getMatchData = _dereq_('./_getMatchData'),
     matchesStrictComparable = _dereq_('./_matchesStrictComparable');
@@ -63714,7 +65977,7 @@ function baseMatches(source) {
 
 module.exports = baseMatches;
 
-},{"./_baseIsMatch":82,"./_getMatchData":138,"./_matchesStrictComparable":176}],92:[function(_dereq_,module,exports){
+},{"./_baseIsMatch":90,"./_getMatchData":146,"./_matchesStrictComparable":184}],100:[function(_dereq_,module,exports){
 var baseIsEqual = _dereq_('./_baseIsEqual'),
     get = _dereq_('./get'),
     hasIn = _dereq_('./hasIn'),
@@ -63749,7 +66012,7 @@ function baseMatchesProperty(path, srcValue) {
 
 module.exports = baseMatchesProperty;
 
-},{"./_baseIsEqual":79,"./_isKey":160,"./_isStrictComparable":164,"./_matchesStrictComparable":176,"./_toKey":200,"./get":216,"./hasIn":218}],93:[function(_dereq_,module,exports){
+},{"./_baseIsEqual":87,"./_isKey":168,"./_isStrictComparable":172,"./_matchesStrictComparable":184,"./_toKey":208,"./get":224,"./hasIn":226}],101:[function(_dereq_,module,exports){
 var Stack = _dereq_('./_Stack'),
     assignMergeValue = _dereq_('./_assignMergeValue'),
     baseFor = _dereq_('./_baseFor'),
@@ -63793,7 +66056,7 @@ function baseMerge(object, source, srcIndex, customizer, stack) {
 
 module.exports = baseMerge;
 
-},{"./_Stack":40,"./_assignMergeValue":57,"./_baseFor":71,"./_baseMergeDeep":94,"./_safeGet":186,"./isObject":234,"./keysIn":241}],94:[function(_dereq_,module,exports){
+},{"./_Stack":48,"./_assignMergeValue":65,"./_baseFor":79,"./_baseMergeDeep":102,"./_safeGet":194,"./isObject":242,"./keysIn":249}],102:[function(_dereq_,module,exports){
 var assignMergeValue = _dereq_('./_assignMergeValue'),
     cloneBuffer = _dereq_('./_cloneBuffer'),
     cloneTypedArray = _dereq_('./_cloneTypedArray'),
@@ -63889,7 +66152,7 @@ function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, sta
 
 module.exports = baseMergeDeep;
 
-},{"./_assignMergeValue":57,"./_cloneBuffer":112,"./_cloneTypedArray":116,"./_copyArray":117,"./_initCloneObject":156,"./_safeGet":186,"./isArguments":220,"./isArray":221,"./isArrayLikeObject":223,"./isBuffer":224,"./isFunction":228,"./isObject":234,"./isPlainObject":236,"./isTypedArray":239,"./toPlainObject":258}],95:[function(_dereq_,module,exports){
+},{"./_assignMergeValue":65,"./_cloneBuffer":120,"./_cloneTypedArray":124,"./_copyArray":125,"./_initCloneObject":164,"./_safeGet":194,"./isArguments":228,"./isArray":229,"./isArrayLikeObject":231,"./isBuffer":232,"./isFunction":236,"./isObject":242,"./isPlainObject":244,"./isTypedArray":247,"./toPlainObject":266}],103:[function(_dereq_,module,exports){
 var baseGet = _dereq_('./_baseGet'),
     baseSet = _dereq_('./_baseSet'),
     castPath = _dereq_('./_castPath');
@@ -63921,7 +66184,7 @@ function basePickBy(object, paths, predicate) {
 
 module.exports = basePickBy;
 
-},{"./_baseGet":73,"./_baseSet":101,"./_castPath":109}],96:[function(_dereq_,module,exports){
+},{"./_baseGet":81,"./_baseSet":109,"./_castPath":117}],104:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.property` without support for deep paths.
  *
@@ -63937,7 +66200,7 @@ function baseProperty(key) {
 
 module.exports = baseProperty;
 
-},{}],97:[function(_dereq_,module,exports){
+},{}],105:[function(_dereq_,module,exports){
 var baseGet = _dereq_('./_baseGet');
 
 /**
@@ -63955,7 +66218,7 @@ function basePropertyDeep(path) {
 
 module.exports = basePropertyDeep;
 
-},{"./_baseGet":73}],98:[function(_dereq_,module,exports){
+},{"./_baseGet":81}],106:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.propertyOf` without support for deep paths.
  *
@@ -63971,7 +66234,7 @@ function basePropertyOf(object) {
 
 module.exports = basePropertyOf;
 
-},{}],99:[function(_dereq_,module,exports){
+},{}],107:[function(_dereq_,module,exports){
 /* Built-in method references for those with the same name as other `lodash` methods. */
 var nativeCeil = Math.ceil,
     nativeMax = Math.max;
@@ -64001,7 +66264,7 @@ function baseRange(start, end, step, fromRight) {
 
 module.exports = baseRange;
 
-},{}],100:[function(_dereq_,module,exports){
+},{}],108:[function(_dereq_,module,exports){
 var identity = _dereq_('./identity'),
     overRest = _dereq_('./_overRest'),
     setToString = _dereq_('./_setToString');
@@ -64020,7 +66283,7 @@ function baseRest(func, start) {
 
 module.exports = baseRest;
 
-},{"./_overRest":184,"./_setToString":190,"./identity":219}],101:[function(_dereq_,module,exports){
+},{"./_overRest":192,"./_setToString":198,"./identity":227}],109:[function(_dereq_,module,exports){
 var assignValue = _dereq_('./_assignValue'),
     castPath = _dereq_('./_castPath'),
     isIndex = _dereq_('./_isIndex'),
@@ -64069,7 +66332,7 @@ function baseSet(object, path, value, customizer) {
 
 module.exports = baseSet;
 
-},{"./_assignValue":58,"./_castPath":109,"./_isIndex":158,"./_toKey":200,"./isObject":234}],102:[function(_dereq_,module,exports){
+},{"./_assignValue":66,"./_castPath":117,"./_isIndex":166,"./_toKey":208,"./isObject":242}],110:[function(_dereq_,module,exports){
 var constant = _dereq_('./constant'),
     defineProperty = _dereq_('./_defineProperty'),
     identity = _dereq_('./identity');
@@ -64093,7 +66356,7 @@ var baseSetToString = !defineProperty ? identity : function(func, string) {
 
 module.exports = baseSetToString;
 
-},{"./_defineProperty":130,"./constant":209,"./identity":219}],103:[function(_dereq_,module,exports){
+},{"./_defineProperty":138,"./constant":217,"./identity":227}],111:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.slice` without an iteratee call guard.
  *
@@ -64126,7 +66389,7 @@ function baseSlice(array, start, end) {
 
 module.exports = baseSlice;
 
-},{}],104:[function(_dereq_,module,exports){
+},{}],112:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.times` without support for iteratee shorthands
  * or max array length checks.
@@ -64148,7 +66411,7 @@ function baseTimes(n, iteratee) {
 
 module.exports = baseTimes;
 
-},{}],105:[function(_dereq_,module,exports){
+},{}],113:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol'),
     arrayMap = _dereq_('./_arrayMap'),
     isArray = _dereq_('./isArray'),
@@ -64187,7 +66450,7 @@ function baseToString(value) {
 
 module.exports = baseToString;
 
-},{"./_Symbol":41,"./_arrayMap":51,"./isArray":221,"./isSymbol":238}],106:[function(_dereq_,module,exports){
+},{"./_Symbol":49,"./_arrayMap":59,"./isArray":229,"./isSymbol":246}],114:[function(_dereq_,module,exports){
 /**
  * The base implementation of `_.unary` without support for storing metadata.
  *
@@ -64203,7 +66466,7 @@ function baseUnary(func) {
 
 module.exports = baseUnary;
 
-},{}],107:[function(_dereq_,module,exports){
+},{}],115:[function(_dereq_,module,exports){
 /**
  * Checks if a `cache` value for `key` exists.
  *
@@ -64218,7 +66481,7 @@ function cacheHas(cache, key) {
 
 module.exports = cacheHas;
 
-},{}],108:[function(_dereq_,module,exports){
+},{}],116:[function(_dereq_,module,exports){
 var identity = _dereq_('./identity');
 
 /**
@@ -64234,7 +66497,7 @@ function castFunction(value) {
 
 module.exports = castFunction;
 
-},{"./identity":219}],109:[function(_dereq_,module,exports){
+},{"./identity":227}],117:[function(_dereq_,module,exports){
 var isArray = _dereq_('./isArray'),
     isKey = _dereq_('./_isKey'),
     stringToPath = _dereq_('./_stringToPath'),
@@ -64257,7 +66520,7 @@ function castPath(value, object) {
 
 module.exports = castPath;
 
-},{"./_isKey":160,"./_stringToPath":199,"./isArray":221,"./toString":259}],110:[function(_dereq_,module,exports){
+},{"./_isKey":168,"./_stringToPath":207,"./isArray":229,"./toString":267}],118:[function(_dereq_,module,exports){
 var baseSlice = _dereq_('./_baseSlice');
 
 /**
@@ -64277,7 +66540,7 @@ function castSlice(array, start, end) {
 
 module.exports = castSlice;
 
-},{"./_baseSlice":103}],111:[function(_dereq_,module,exports){
+},{"./_baseSlice":111}],119:[function(_dereq_,module,exports){
 var Uint8Array = _dereq_('./_Uint8Array');
 
 /**
@@ -64295,7 +66558,7 @@ function cloneArrayBuffer(arrayBuffer) {
 
 module.exports = cloneArrayBuffer;
 
-},{"./_Uint8Array":42}],112:[function(_dereq_,module,exports){
+},{"./_Uint8Array":50}],120:[function(_dereq_,module,exports){
 var root = _dereq_('./_root');
 
 /** Detect free variable `exports`. */
@@ -64332,7 +66595,7 @@ function cloneBuffer(buffer, isDeep) {
 
 module.exports = cloneBuffer;
 
-},{"./_root":185}],113:[function(_dereq_,module,exports){
+},{"./_root":193}],121:[function(_dereq_,module,exports){
 var cloneArrayBuffer = _dereq_('./_cloneArrayBuffer');
 
 /**
@@ -64350,7 +66613,7 @@ function cloneDataView(dataView, isDeep) {
 
 module.exports = cloneDataView;
 
-},{"./_cloneArrayBuffer":111}],114:[function(_dereq_,module,exports){
+},{"./_cloneArrayBuffer":119}],122:[function(_dereq_,module,exports){
 /** Used to match `RegExp` flags from their coerced string values. */
 var reFlags = /\w*$/;
 
@@ -64369,7 +66632,7 @@ function cloneRegExp(regexp) {
 
 module.exports = cloneRegExp;
 
-},{}],115:[function(_dereq_,module,exports){
+},{}],123:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol');
 
 /** Used to convert symbols to primitives and strings. */
@@ -64389,7 +66652,7 @@ function cloneSymbol(symbol) {
 
 module.exports = cloneSymbol;
 
-},{"./_Symbol":41}],116:[function(_dereq_,module,exports){
+},{"./_Symbol":49}],124:[function(_dereq_,module,exports){
 var cloneArrayBuffer = _dereq_('./_cloneArrayBuffer');
 
 /**
@@ -64407,7 +66670,7 @@ function cloneTypedArray(typedArray, isDeep) {
 
 module.exports = cloneTypedArray;
 
-},{"./_cloneArrayBuffer":111}],117:[function(_dereq_,module,exports){
+},{"./_cloneArrayBuffer":119}],125:[function(_dereq_,module,exports){
 /**
  * Copies the values of `source` to `array`.
  *
@@ -64429,7 +66692,7 @@ function copyArray(source, array) {
 
 module.exports = copyArray;
 
-},{}],118:[function(_dereq_,module,exports){
+},{}],126:[function(_dereq_,module,exports){
 var assignValue = _dereq_('./_assignValue'),
     baseAssignValue = _dereq_('./_baseAssignValue');
 
@@ -64471,7 +66734,7 @@ function copyObject(source, props, object, customizer) {
 
 module.exports = copyObject;
 
-},{"./_assignValue":58,"./_baseAssignValue":63}],119:[function(_dereq_,module,exports){
+},{"./_assignValue":66,"./_baseAssignValue":71}],127:[function(_dereq_,module,exports){
 var copyObject = _dereq_('./_copyObject'),
     getSymbols = _dereq_('./_getSymbols');
 
@@ -64489,7 +66752,7 @@ function copySymbols(source, object) {
 
 module.exports = copySymbols;
 
-},{"./_copyObject":118,"./_getSymbols":142}],120:[function(_dereq_,module,exports){
+},{"./_copyObject":126,"./_getSymbols":150}],128:[function(_dereq_,module,exports){
 var copyObject = _dereq_('./_copyObject'),
     getSymbolsIn = _dereq_('./_getSymbolsIn');
 
@@ -64507,7 +66770,7 @@ function copySymbolsIn(source, object) {
 
 module.exports = copySymbolsIn;
 
-},{"./_copyObject":118,"./_getSymbolsIn":143}],121:[function(_dereq_,module,exports){
+},{"./_copyObject":126,"./_getSymbolsIn":151}],129:[function(_dereq_,module,exports){
 var root = _dereq_('./_root');
 
 /** Used to detect overreaching core-js shims. */
@@ -64515,7 +66778,7 @@ var coreJsData = root['__core-js_shared__'];
 
 module.exports = coreJsData;
 
-},{"./_root":185}],122:[function(_dereq_,module,exports){
+},{"./_root":193}],130:[function(_dereq_,module,exports){
 var arrayAggregator = _dereq_('./_arrayAggregator'),
     baseAggregator = _dereq_('./_baseAggregator'),
     baseIteratee = _dereq_('./_baseIteratee'),
@@ -64540,7 +66803,7 @@ function createAggregator(setter, initializer) {
 
 module.exports = createAggregator;
 
-},{"./_arrayAggregator":45,"./_baseAggregator":60,"./_baseIteratee":87,"./isArray":221}],123:[function(_dereq_,module,exports){
+},{"./_arrayAggregator":53,"./_baseAggregator":68,"./_baseIteratee":95,"./isArray":229}],131:[function(_dereq_,module,exports){
 var baseRest = _dereq_('./_baseRest'),
     isIterateeCall = _dereq_('./_isIterateeCall');
 
@@ -64579,7 +66842,7 @@ function createAssigner(assigner) {
 
 module.exports = createAssigner;
 
-},{"./_baseRest":100,"./_isIterateeCall":159}],124:[function(_dereq_,module,exports){
+},{"./_baseRest":108,"./_isIterateeCall":167}],132:[function(_dereq_,module,exports){
 var isArrayLike = _dereq_('./isArrayLike');
 
 /**
@@ -64613,7 +66876,7 @@ function createBaseEach(eachFunc, fromRight) {
 
 module.exports = createBaseEach;
 
-},{"./isArrayLike":222}],125:[function(_dereq_,module,exports){
+},{"./isArrayLike":230}],133:[function(_dereq_,module,exports){
 /**
  * Creates a base function for methods like `_.forIn` and `_.forOwn`.
  *
@@ -64640,7 +66903,7 @@ function createBaseFor(fromRight) {
 
 module.exports = createBaseFor;
 
-},{}],126:[function(_dereq_,module,exports){
+},{}],134:[function(_dereq_,module,exports){
 var castSlice = _dereq_('./_castSlice'),
     hasUnicode = _dereq_('./_hasUnicode'),
     stringToArray = _dereq_('./_stringToArray'),
@@ -64675,7 +66938,7 @@ function createCaseFirst(methodName) {
 
 module.exports = createCaseFirst;
 
-},{"./_castSlice":110,"./_hasUnicode":147,"./_stringToArray":198,"./toString":259}],127:[function(_dereq_,module,exports){
+},{"./_castSlice":118,"./_hasUnicode":155,"./_stringToArray":206,"./toString":267}],135:[function(_dereq_,module,exports){
 var arrayReduce = _dereq_('./_arrayReduce'),
     deburr = _dereq_('./deburr'),
     words = _dereq_('./words');
@@ -64701,7 +66964,7 @@ function createCompounder(callback) {
 
 module.exports = createCompounder;
 
-},{"./_arrayReduce":53,"./deburr":210,"./words":262}],128:[function(_dereq_,module,exports){
+},{"./_arrayReduce":61,"./deburr":218,"./words":270}],136:[function(_dereq_,module,exports){
 var baseRange = _dereq_('./_baseRange'),
     isIterateeCall = _dereq_('./_isIterateeCall'),
     toFinite = _dereq_('./toFinite');
@@ -64733,7 +66996,7 @@ function createRange(fromRight) {
 
 module.exports = createRange;
 
-},{"./_baseRange":99,"./_isIterateeCall":159,"./toFinite":256}],129:[function(_dereq_,module,exports){
+},{"./_baseRange":107,"./_isIterateeCall":167,"./toFinite":264}],137:[function(_dereq_,module,exports){
 var basePropertyOf = _dereq_('./_basePropertyOf');
 
 /** Used to map Latin Unicode letters to basic Latin letters. */
@@ -64806,7 +67069,7 @@ var deburrLetter = basePropertyOf(deburredLetters);
 
 module.exports = deburrLetter;
 
-},{"./_basePropertyOf":98}],130:[function(_dereq_,module,exports){
+},{"./_basePropertyOf":106}],138:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative');
 
 var defineProperty = (function() {
@@ -64819,7 +67082,7 @@ var defineProperty = (function() {
 
 module.exports = defineProperty;
 
-},{"./_getNative":139}],131:[function(_dereq_,module,exports){
+},{"./_getNative":147}],139:[function(_dereq_,module,exports){
 var SetCache = _dereq_('./_SetCache'),
     arraySome = _dereq_('./_arraySome'),
     cacheHas = _dereq_('./_cacheHas');
@@ -64904,7 +67167,7 @@ function equalArrays(array, other, bitmask, customizer, equalFunc, stack) {
 
 module.exports = equalArrays;
 
-},{"./_SetCache":39,"./_arraySome":54,"./_cacheHas":107}],132:[function(_dereq_,module,exports){
+},{"./_SetCache":47,"./_arraySome":62,"./_cacheHas":115}],140:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol'),
     Uint8Array = _dereq_('./_Uint8Array'),
     eq = _dereq_('./eq'),
@@ -65018,7 +67281,7 @@ function equalByTag(object, other, tag, bitmask, customizer, equalFunc, stack) {
 
 module.exports = equalByTag;
 
-},{"./_Symbol":41,"./_Uint8Array":42,"./_equalArrays":131,"./_mapToArray":175,"./_setToArray":189,"./eq":213}],133:[function(_dereq_,module,exports){
+},{"./_Symbol":49,"./_Uint8Array":50,"./_equalArrays":139,"./_mapToArray":183,"./_setToArray":197,"./eq":221}],141:[function(_dereq_,module,exports){
 var getAllKeys = _dereq_('./_getAllKeys');
 
 /** Used to compose bitmasks for value comparisons. */
@@ -65109,7 +67372,7 @@ function equalObjects(object, other, bitmask, customizer, equalFunc, stack) {
 
 module.exports = equalObjects;
 
-},{"./_getAllKeys":135}],134:[function(_dereq_,module,exports){
+},{"./_getAllKeys":143}],142:[function(_dereq_,module,exports){
 (function (global){
 /** Detect free variable `global` from Node.js. */
 var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
@@ -65117,7 +67380,7 @@ var freeGlobal = typeof global == 'object' && global && global.Object === Object
 module.exports = freeGlobal;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],135:[function(_dereq_,module,exports){
+},{}],143:[function(_dereq_,module,exports){
 var baseGetAllKeys = _dereq_('./_baseGetAllKeys'),
     getSymbols = _dereq_('./_getSymbols'),
     keys = _dereq_('./keys');
@@ -65135,7 +67398,7 @@ function getAllKeys(object) {
 
 module.exports = getAllKeys;
 
-},{"./_baseGetAllKeys":74,"./_getSymbols":142,"./keys":240}],136:[function(_dereq_,module,exports){
+},{"./_baseGetAllKeys":82,"./_getSymbols":150,"./keys":248}],144:[function(_dereq_,module,exports){
 var baseGetAllKeys = _dereq_('./_baseGetAllKeys'),
     getSymbolsIn = _dereq_('./_getSymbolsIn'),
     keysIn = _dereq_('./keysIn');
@@ -65154,7 +67417,7 @@ function getAllKeysIn(object) {
 
 module.exports = getAllKeysIn;
 
-},{"./_baseGetAllKeys":74,"./_getSymbolsIn":143,"./keysIn":241}],137:[function(_dereq_,module,exports){
+},{"./_baseGetAllKeys":82,"./_getSymbolsIn":151,"./keysIn":249}],145:[function(_dereq_,module,exports){
 var isKeyable = _dereq_('./_isKeyable');
 
 /**
@@ -65174,7 +67437,7 @@ function getMapData(map, key) {
 
 module.exports = getMapData;
 
-},{"./_isKeyable":161}],138:[function(_dereq_,module,exports){
+},{"./_isKeyable":169}],146:[function(_dereq_,module,exports){
 var isStrictComparable = _dereq_('./_isStrictComparable'),
     keys = _dereq_('./keys');
 
@@ -65200,7 +67463,7 @@ function getMatchData(object) {
 
 module.exports = getMatchData;
 
-},{"./_isStrictComparable":164,"./keys":240}],139:[function(_dereq_,module,exports){
+},{"./_isStrictComparable":172,"./keys":248}],147:[function(_dereq_,module,exports){
 var baseIsNative = _dereq_('./_baseIsNative'),
     getValue = _dereq_('./_getValue');
 
@@ -65219,7 +67482,7 @@ function getNative(object, key) {
 
 module.exports = getNative;
 
-},{"./_baseIsNative":84,"./_getValue":145}],140:[function(_dereq_,module,exports){
+},{"./_baseIsNative":92,"./_getValue":153}],148:[function(_dereq_,module,exports){
 var overArg = _dereq_('./_overArg');
 
 /** Built-in value references. */
@@ -65227,7 +67490,7 @@ var getPrototype = overArg(Object.getPrototypeOf, Object);
 
 module.exports = getPrototype;
 
-},{"./_overArg":183}],141:[function(_dereq_,module,exports){
+},{"./_overArg":191}],149:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol');
 
 /** Used for built-in method references. */
@@ -65275,7 +67538,7 @@ function getRawTag(value) {
 
 module.exports = getRawTag;
 
-},{"./_Symbol":41}],142:[function(_dereq_,module,exports){
+},{"./_Symbol":49}],150:[function(_dereq_,module,exports){
 var arrayFilter = _dereq_('./_arrayFilter'),
     stubArray = _dereq_('./stubArray');
 
@@ -65307,7 +67570,7 @@ var getSymbols = !nativeGetSymbols ? stubArray : function(object) {
 
 module.exports = getSymbols;
 
-},{"./_arrayFilter":47,"./stubArray":254}],143:[function(_dereq_,module,exports){
+},{"./_arrayFilter":55,"./stubArray":262}],151:[function(_dereq_,module,exports){
 var arrayPush = _dereq_('./_arrayPush'),
     getPrototype = _dereq_('./_getPrototype'),
     getSymbols = _dereq_('./_getSymbols'),
@@ -65334,7 +67597,7 @@ var getSymbolsIn = !nativeGetSymbols ? stubArray : function(object) {
 
 module.exports = getSymbolsIn;
 
-},{"./_arrayPush":52,"./_getPrototype":140,"./_getSymbols":142,"./stubArray":254}],144:[function(_dereq_,module,exports){
+},{"./_arrayPush":60,"./_getPrototype":148,"./_getSymbols":150,"./stubArray":262}],152:[function(_dereq_,module,exports){
 var DataView = _dereq_('./_DataView'),
     Map = _dereq_('./_Map'),
     Promise = _dereq_('./_Promise'),
@@ -65394,7 +67657,7 @@ if ((DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag) ||
 
 module.exports = getTag;
 
-},{"./_DataView":32,"./_Map":35,"./_Promise":37,"./_Set":38,"./_WeakMap":43,"./_baseGetTag":75,"./_toSource":201}],145:[function(_dereq_,module,exports){
+},{"./_DataView":40,"./_Map":43,"./_Promise":45,"./_Set":46,"./_WeakMap":51,"./_baseGetTag":83,"./_toSource":209}],153:[function(_dereq_,module,exports){
 /**
  * Gets the value at `key` of `object`.
  *
@@ -65409,7 +67672,7 @@ function getValue(object, key) {
 
 module.exports = getValue;
 
-},{}],146:[function(_dereq_,module,exports){
+},{}],154:[function(_dereq_,module,exports){
 var castPath = _dereq_('./_castPath'),
     isArguments = _dereq_('./isArguments'),
     isArray = _dereq_('./isArray'),
@@ -65450,7 +67713,7 @@ function hasPath(object, path, hasFunc) {
 
 module.exports = hasPath;
 
-},{"./_castPath":109,"./_isIndex":158,"./_toKey":200,"./isArguments":220,"./isArray":221,"./isLength":229}],147:[function(_dereq_,module,exports){
+},{"./_castPath":117,"./_isIndex":166,"./_toKey":208,"./isArguments":228,"./isArray":229,"./isLength":237}],155:[function(_dereq_,module,exports){
 /** Used to compose unicode character classes. */
 var rsAstralRange = '\\ud800-\\udfff',
     rsComboMarksRange = '\\u0300-\\u036f',
@@ -65478,7 +67741,7 @@ function hasUnicode(string) {
 
 module.exports = hasUnicode;
 
-},{}],148:[function(_dereq_,module,exports){
+},{}],156:[function(_dereq_,module,exports){
 /** Used to detect strings that need a more robust regexp to match words. */
 var reHasUnicodeWord = /[a-z][A-Z]|[A-Z]{2,}[a-z]|[0-9][a-zA-Z]|[a-zA-Z][0-9]|[^a-zA-Z0-9 ]/;
 
@@ -65495,7 +67758,7 @@ function hasUnicodeWord(string) {
 
 module.exports = hasUnicodeWord;
 
-},{}],149:[function(_dereq_,module,exports){
+},{}],157:[function(_dereq_,module,exports){
 var nativeCreate = _dereq_('./_nativeCreate');
 
 /**
@@ -65512,7 +67775,7 @@ function hashClear() {
 
 module.exports = hashClear;
 
-},{"./_nativeCreate":178}],150:[function(_dereq_,module,exports){
+},{"./_nativeCreate":186}],158:[function(_dereq_,module,exports){
 /**
  * Removes `key` and its value from the hash.
  *
@@ -65531,7 +67794,7 @@ function hashDelete(key) {
 
 module.exports = hashDelete;
 
-},{}],151:[function(_dereq_,module,exports){
+},{}],159:[function(_dereq_,module,exports){
 var nativeCreate = _dereq_('./_nativeCreate');
 
 /** Used to stand-in for `undefined` hash values. */
@@ -65563,7 +67826,7 @@ function hashGet(key) {
 
 module.exports = hashGet;
 
-},{"./_nativeCreate":178}],152:[function(_dereq_,module,exports){
+},{"./_nativeCreate":186}],160:[function(_dereq_,module,exports){
 var nativeCreate = _dereq_('./_nativeCreate');
 
 /** Used for built-in method references. */
@@ -65588,7 +67851,7 @@ function hashHas(key) {
 
 module.exports = hashHas;
 
-},{"./_nativeCreate":178}],153:[function(_dereq_,module,exports){
+},{"./_nativeCreate":186}],161:[function(_dereq_,module,exports){
 var nativeCreate = _dereq_('./_nativeCreate');
 
 /** Used to stand-in for `undefined` hash values. */
@@ -65613,7 +67876,7 @@ function hashSet(key, value) {
 
 module.exports = hashSet;
 
-},{"./_nativeCreate":178}],154:[function(_dereq_,module,exports){
+},{"./_nativeCreate":186}],162:[function(_dereq_,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -65641,7 +67904,7 @@ function initCloneArray(array) {
 
 module.exports = initCloneArray;
 
-},{}],155:[function(_dereq_,module,exports){
+},{}],163:[function(_dereq_,module,exports){
 var cloneArrayBuffer = _dereq_('./_cloneArrayBuffer'),
     cloneDataView = _dereq_('./_cloneDataView'),
     cloneRegExp = _dereq_('./_cloneRegExp'),
@@ -65720,7 +67983,7 @@ function initCloneByTag(object, tag, isDeep) {
 
 module.exports = initCloneByTag;
 
-},{"./_cloneArrayBuffer":111,"./_cloneDataView":113,"./_cloneRegExp":114,"./_cloneSymbol":115,"./_cloneTypedArray":116}],156:[function(_dereq_,module,exports){
+},{"./_cloneArrayBuffer":119,"./_cloneDataView":121,"./_cloneRegExp":122,"./_cloneSymbol":123,"./_cloneTypedArray":124}],164:[function(_dereq_,module,exports){
 var baseCreate = _dereq_('./_baseCreate'),
     getPrototype = _dereq_('./_getPrototype'),
     isPrototype = _dereq_('./_isPrototype');
@@ -65740,7 +68003,7 @@ function initCloneObject(object) {
 
 module.exports = initCloneObject;
 
-},{"./_baseCreate":65,"./_getPrototype":140,"./_isPrototype":163}],157:[function(_dereq_,module,exports){
+},{"./_baseCreate":73,"./_getPrototype":148,"./_isPrototype":171}],165:[function(_dereq_,module,exports){
 var Symbol = _dereq_('./_Symbol'),
     isArguments = _dereq_('./isArguments'),
     isArray = _dereq_('./isArray');
@@ -65762,7 +68025,7 @@ function isFlattenable(value) {
 
 module.exports = isFlattenable;
 
-},{"./_Symbol":41,"./isArguments":220,"./isArray":221}],158:[function(_dereq_,module,exports){
+},{"./_Symbol":49,"./isArguments":228,"./isArray":229}],166:[function(_dereq_,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -65789,7 +68052,7 @@ function isIndex(value, length) {
 
 module.exports = isIndex;
 
-},{}],159:[function(_dereq_,module,exports){
+},{}],167:[function(_dereq_,module,exports){
 var eq = _dereq_('./eq'),
     isArrayLike = _dereq_('./isArrayLike'),
     isIndex = _dereq_('./_isIndex'),
@@ -65821,7 +68084,7 @@ function isIterateeCall(value, index, object) {
 
 module.exports = isIterateeCall;
 
-},{"./_isIndex":158,"./eq":213,"./isArrayLike":222,"./isObject":234}],160:[function(_dereq_,module,exports){
+},{"./_isIndex":166,"./eq":221,"./isArrayLike":230,"./isObject":242}],168:[function(_dereq_,module,exports){
 var isArray = _dereq_('./isArray'),
     isSymbol = _dereq_('./isSymbol');
 
@@ -65852,7 +68115,7 @@ function isKey(value, object) {
 
 module.exports = isKey;
 
-},{"./isArray":221,"./isSymbol":238}],161:[function(_dereq_,module,exports){
+},{"./isArray":229,"./isSymbol":246}],169:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is suitable for use as unique object key.
  *
@@ -65869,7 +68132,7 @@ function isKeyable(value) {
 
 module.exports = isKeyable;
 
-},{}],162:[function(_dereq_,module,exports){
+},{}],170:[function(_dereq_,module,exports){
 var coreJsData = _dereq_('./_coreJsData');
 
 /** Used to detect methods masquerading as native. */
@@ -65891,7 +68154,7 @@ function isMasked(func) {
 
 module.exports = isMasked;
 
-},{"./_coreJsData":121}],163:[function(_dereq_,module,exports){
+},{"./_coreJsData":129}],171:[function(_dereq_,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -65911,7 +68174,7 @@ function isPrototype(value) {
 
 module.exports = isPrototype;
 
-},{}],164:[function(_dereq_,module,exports){
+},{}],172:[function(_dereq_,module,exports){
 var isObject = _dereq_('./isObject');
 
 /**
@@ -65928,7 +68191,7 @@ function isStrictComparable(value) {
 
 module.exports = isStrictComparable;
 
-},{"./isObject":234}],165:[function(_dereq_,module,exports){
+},{"./isObject":242}],173:[function(_dereq_,module,exports){
 /**
  * Removes all key-value entries from the list cache.
  *
@@ -65943,7 +68206,7 @@ function listCacheClear() {
 
 module.exports = listCacheClear;
 
-},{}],166:[function(_dereq_,module,exports){
+},{}],174:[function(_dereq_,module,exports){
 var assocIndexOf = _dereq_('./_assocIndexOf');
 
 /** Used for built-in method references. */
@@ -65980,7 +68243,7 @@ function listCacheDelete(key) {
 
 module.exports = listCacheDelete;
 
-},{"./_assocIndexOf":59}],167:[function(_dereq_,module,exports){
+},{"./_assocIndexOf":67}],175:[function(_dereq_,module,exports){
 var assocIndexOf = _dereq_('./_assocIndexOf');
 
 /**
@@ -66001,7 +68264,7 @@ function listCacheGet(key) {
 
 module.exports = listCacheGet;
 
-},{"./_assocIndexOf":59}],168:[function(_dereq_,module,exports){
+},{"./_assocIndexOf":67}],176:[function(_dereq_,module,exports){
 var assocIndexOf = _dereq_('./_assocIndexOf');
 
 /**
@@ -66019,7 +68282,7 @@ function listCacheHas(key) {
 
 module.exports = listCacheHas;
 
-},{"./_assocIndexOf":59}],169:[function(_dereq_,module,exports){
+},{"./_assocIndexOf":67}],177:[function(_dereq_,module,exports){
 var assocIndexOf = _dereq_('./_assocIndexOf');
 
 /**
@@ -66047,7 +68310,7 @@ function listCacheSet(key, value) {
 
 module.exports = listCacheSet;
 
-},{"./_assocIndexOf":59}],170:[function(_dereq_,module,exports){
+},{"./_assocIndexOf":67}],178:[function(_dereq_,module,exports){
 var Hash = _dereq_('./_Hash'),
     ListCache = _dereq_('./_ListCache'),
     Map = _dereq_('./_Map');
@@ -66070,7 +68333,7 @@ function mapCacheClear() {
 
 module.exports = mapCacheClear;
 
-},{"./_Hash":33,"./_ListCache":34,"./_Map":35}],171:[function(_dereq_,module,exports){
+},{"./_Hash":41,"./_ListCache":42,"./_Map":43}],179:[function(_dereq_,module,exports){
 var getMapData = _dereq_('./_getMapData');
 
 /**
@@ -66090,7 +68353,7 @@ function mapCacheDelete(key) {
 
 module.exports = mapCacheDelete;
 
-},{"./_getMapData":137}],172:[function(_dereq_,module,exports){
+},{"./_getMapData":145}],180:[function(_dereq_,module,exports){
 var getMapData = _dereq_('./_getMapData');
 
 /**
@@ -66108,7 +68371,7 @@ function mapCacheGet(key) {
 
 module.exports = mapCacheGet;
 
-},{"./_getMapData":137}],173:[function(_dereq_,module,exports){
+},{"./_getMapData":145}],181:[function(_dereq_,module,exports){
 var getMapData = _dereq_('./_getMapData');
 
 /**
@@ -66126,7 +68389,7 @@ function mapCacheHas(key) {
 
 module.exports = mapCacheHas;
 
-},{"./_getMapData":137}],174:[function(_dereq_,module,exports){
+},{"./_getMapData":145}],182:[function(_dereq_,module,exports){
 var getMapData = _dereq_('./_getMapData');
 
 /**
@@ -66150,7 +68413,7 @@ function mapCacheSet(key, value) {
 
 module.exports = mapCacheSet;
 
-},{"./_getMapData":137}],175:[function(_dereq_,module,exports){
+},{"./_getMapData":145}],183:[function(_dereq_,module,exports){
 /**
  * Converts `map` to its key-value pairs.
  *
@@ -66170,7 +68433,7 @@ function mapToArray(map) {
 
 module.exports = mapToArray;
 
-},{}],176:[function(_dereq_,module,exports){
+},{}],184:[function(_dereq_,module,exports){
 /**
  * A specialized version of `matchesProperty` for source values suitable
  * for strict equality comparisons, i.e. `===`.
@@ -66192,7 +68455,7 @@ function matchesStrictComparable(key, srcValue) {
 
 module.exports = matchesStrictComparable;
 
-},{}],177:[function(_dereq_,module,exports){
+},{}],185:[function(_dereq_,module,exports){
 var memoize = _dereq_('./memoize');
 
 /** Used as the maximum memoize cache size. */
@@ -66220,7 +68483,7 @@ function memoizeCapped(func) {
 
 module.exports = memoizeCapped;
 
-},{"./memoize":245}],178:[function(_dereq_,module,exports){
+},{"./memoize":253}],186:[function(_dereq_,module,exports){
 var getNative = _dereq_('./_getNative');
 
 /* Built-in method references that are verified to be native. */
@@ -66228,7 +68491,7 @@ var nativeCreate = getNative(Object, 'create');
 
 module.exports = nativeCreate;
 
-},{"./_getNative":139}],179:[function(_dereq_,module,exports){
+},{"./_getNative":147}],187:[function(_dereq_,module,exports){
 var overArg = _dereq_('./_overArg');
 
 /* Built-in method references for those with the same name as other `lodash` methods. */
@@ -66236,7 +68499,7 @@ var nativeKeys = overArg(Object.keys, Object);
 
 module.exports = nativeKeys;
 
-},{"./_overArg":183}],180:[function(_dereq_,module,exports){
+},{"./_overArg":191}],188:[function(_dereq_,module,exports){
 /**
  * This function is like
  * [`Object.keys`](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
@@ -66258,7 +68521,7 @@ function nativeKeysIn(object) {
 
 module.exports = nativeKeysIn;
 
-},{}],181:[function(_dereq_,module,exports){
+},{}],189:[function(_dereq_,module,exports){
 var freeGlobal = _dereq_('./_freeGlobal');
 
 /** Detect free variable `exports`. */
@@ -66290,7 +68553,7 @@ var nodeUtil = (function() {
 
 module.exports = nodeUtil;
 
-},{"./_freeGlobal":134}],182:[function(_dereq_,module,exports){
+},{"./_freeGlobal":142}],190:[function(_dereq_,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -66314,7 +68577,7 @@ function objectToString(value) {
 
 module.exports = objectToString;
 
-},{}],183:[function(_dereq_,module,exports){
+},{}],191:[function(_dereq_,module,exports){
 /**
  * Creates a unary function that invokes `func` with its argument transformed.
  *
@@ -66331,7 +68594,7 @@ function overArg(func, transform) {
 
 module.exports = overArg;
 
-},{}],184:[function(_dereq_,module,exports){
+},{}],192:[function(_dereq_,module,exports){
 var apply = _dereq_('./_apply');
 
 /* Built-in method references for those with the same name as other `lodash` methods. */
@@ -66369,7 +68632,7 @@ function overRest(func, start, transform) {
 
 module.exports = overRest;
 
-},{"./_apply":44}],185:[function(_dereq_,module,exports){
+},{"./_apply":52}],193:[function(_dereq_,module,exports){
 var freeGlobal = _dereq_('./_freeGlobal');
 
 /** Detect free variable `self`. */
@@ -66380,7 +68643,7 @@ var root = freeGlobal || freeSelf || Function('return this')();
 
 module.exports = root;
 
-},{"./_freeGlobal":134}],186:[function(_dereq_,module,exports){
+},{"./_freeGlobal":142}],194:[function(_dereq_,module,exports){
 /**
  * Gets the value at `key`, unless `key` is "__proto__".
  *
@@ -66397,7 +68660,7 @@ function safeGet(object, key) {
 
 module.exports = safeGet;
 
-},{}],187:[function(_dereq_,module,exports){
+},{}],195:[function(_dereq_,module,exports){
 /** Used to stand-in for `undefined` hash values. */
 var HASH_UNDEFINED = '__lodash_hash_undefined__';
 
@@ -66418,7 +68681,7 @@ function setCacheAdd(value) {
 
 module.exports = setCacheAdd;
 
-},{}],188:[function(_dereq_,module,exports){
+},{}],196:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is in the array cache.
  *
@@ -66434,7 +68697,7 @@ function setCacheHas(value) {
 
 module.exports = setCacheHas;
 
-},{}],189:[function(_dereq_,module,exports){
+},{}],197:[function(_dereq_,module,exports){
 /**
  * Converts `set` to an array of its values.
  *
@@ -66454,7 +68717,7 @@ function setToArray(set) {
 
 module.exports = setToArray;
 
-},{}],190:[function(_dereq_,module,exports){
+},{}],198:[function(_dereq_,module,exports){
 var baseSetToString = _dereq_('./_baseSetToString'),
     shortOut = _dereq_('./_shortOut');
 
@@ -66470,7 +68733,7 @@ var setToString = shortOut(baseSetToString);
 
 module.exports = setToString;
 
-},{"./_baseSetToString":102,"./_shortOut":191}],191:[function(_dereq_,module,exports){
+},{"./_baseSetToString":110,"./_shortOut":199}],199:[function(_dereq_,module,exports){
 /** Used to detect hot functions by number of calls within a span of milliseconds. */
 var HOT_COUNT = 800,
     HOT_SPAN = 16;
@@ -66509,7 +68772,7 @@ function shortOut(func) {
 
 module.exports = shortOut;
 
-},{}],192:[function(_dereq_,module,exports){
+},{}],200:[function(_dereq_,module,exports){
 var ListCache = _dereq_('./_ListCache');
 
 /**
@@ -66526,7 +68789,7 @@ function stackClear() {
 
 module.exports = stackClear;
 
-},{"./_ListCache":34}],193:[function(_dereq_,module,exports){
+},{"./_ListCache":42}],201:[function(_dereq_,module,exports){
 /**
  * Removes `key` and its value from the stack.
  *
@@ -66546,7 +68809,7 @@ function stackDelete(key) {
 
 module.exports = stackDelete;
 
-},{}],194:[function(_dereq_,module,exports){
+},{}],202:[function(_dereq_,module,exports){
 /**
  * Gets the stack value for `key`.
  *
@@ -66562,7 +68825,7 @@ function stackGet(key) {
 
 module.exports = stackGet;
 
-},{}],195:[function(_dereq_,module,exports){
+},{}],203:[function(_dereq_,module,exports){
 /**
  * Checks if a stack value for `key` exists.
  *
@@ -66578,7 +68841,7 @@ function stackHas(key) {
 
 module.exports = stackHas;
 
-},{}],196:[function(_dereq_,module,exports){
+},{}],204:[function(_dereq_,module,exports){
 var ListCache = _dereq_('./_ListCache'),
     Map = _dereq_('./_Map'),
     MapCache = _dereq_('./_MapCache');
@@ -66614,7 +68877,7 @@ function stackSet(key, value) {
 
 module.exports = stackSet;
 
-},{"./_ListCache":34,"./_Map":35,"./_MapCache":36}],197:[function(_dereq_,module,exports){
+},{"./_ListCache":42,"./_Map":43,"./_MapCache":44}],205:[function(_dereq_,module,exports){
 /**
  * A specialized version of `_.indexOf` which performs strict equality
  * comparisons of values, i.e. `===`.
@@ -66639,7 +68902,7 @@ function strictIndexOf(array, value, fromIndex) {
 
 module.exports = strictIndexOf;
 
-},{}],198:[function(_dereq_,module,exports){
+},{}],206:[function(_dereq_,module,exports){
 var asciiToArray = _dereq_('./_asciiToArray'),
     hasUnicode = _dereq_('./_hasUnicode'),
     unicodeToArray = _dereq_('./_unicodeToArray');
@@ -66659,7 +68922,7 @@ function stringToArray(string) {
 
 module.exports = stringToArray;
 
-},{"./_asciiToArray":55,"./_hasUnicode":147,"./_unicodeToArray":202}],199:[function(_dereq_,module,exports){
+},{"./_asciiToArray":63,"./_hasUnicode":155,"./_unicodeToArray":210}],207:[function(_dereq_,module,exports){
 var memoizeCapped = _dereq_('./_memoizeCapped');
 
 /** Used to match property names within property paths. */
@@ -66688,7 +68951,7 @@ var stringToPath = memoizeCapped(function(string) {
 
 module.exports = stringToPath;
 
-},{"./_memoizeCapped":177}],200:[function(_dereq_,module,exports){
+},{"./_memoizeCapped":185}],208:[function(_dereq_,module,exports){
 var isSymbol = _dereq_('./isSymbol');
 
 /** Used as references for various `Number` constants. */
@@ -66711,7 +68974,7 @@ function toKey(value) {
 
 module.exports = toKey;
 
-},{"./isSymbol":238}],201:[function(_dereq_,module,exports){
+},{"./isSymbol":246}],209:[function(_dereq_,module,exports){
 /** Used for built-in method references. */
 var funcProto = Function.prototype;
 
@@ -66739,7 +69002,7 @@ function toSource(func) {
 
 module.exports = toSource;
 
-},{}],202:[function(_dereq_,module,exports){
+},{}],210:[function(_dereq_,module,exports){
 /** Used to compose unicode character classes. */
 var rsAstralRange = '\\ud800-\\udfff',
     rsComboMarksRange = '\\u0300-\\u036f',
@@ -66781,7 +69044,7 @@ function unicodeToArray(string) {
 
 module.exports = unicodeToArray;
 
-},{}],203:[function(_dereq_,module,exports){
+},{}],211:[function(_dereq_,module,exports){
 /** Used to compose unicode character classes. */
 var rsAstralRange = '\\ud800-\\udfff',
     rsComboMarksRange = '\\u0300-\\u036f',
@@ -66852,7 +69115,7 @@ function unicodeWords(string) {
 
 module.exports = unicodeWords;
 
-},{}],204:[function(_dereq_,module,exports){
+},{}],212:[function(_dereq_,module,exports){
 var assignValue = _dereq_('./_assignValue'),
     copyObject = _dereq_('./_copyObject'),
     createAssigner = _dereq_('./_createAssigner'),
@@ -66912,7 +69175,7 @@ var assign = createAssigner(function(object, source) {
 
 module.exports = assign;
 
-},{"./_assignValue":58,"./_copyObject":118,"./_createAssigner":123,"./_isPrototype":163,"./isArrayLike":222,"./keys":240}],205:[function(_dereq_,module,exports){
+},{"./_assignValue":66,"./_copyObject":126,"./_createAssigner":131,"./_isPrototype":171,"./isArrayLike":230,"./keys":248}],213:[function(_dereq_,module,exports){
 var capitalize = _dereq_('./capitalize'),
     createCompounder = _dereq_('./_createCompounder');
 
@@ -66943,7 +69206,7 @@ var camelCase = createCompounder(function(result, word, index) {
 
 module.exports = camelCase;
 
-},{"./_createCompounder":127,"./capitalize":206}],206:[function(_dereq_,module,exports){
+},{"./_createCompounder":135,"./capitalize":214}],214:[function(_dereq_,module,exports){
 var toString = _dereq_('./toString'),
     upperFirst = _dereq_('./upperFirst');
 
@@ -66968,7 +69231,7 @@ function capitalize(string) {
 
 module.exports = capitalize;
 
-},{"./toString":259,"./upperFirst":260}],207:[function(_dereq_,module,exports){
+},{"./toString":267,"./upperFirst":268}],215:[function(_dereq_,module,exports){
 var baseClone = _dereq_('./_baseClone');
 
 /** Used to compose bitmasks for cloning. */
@@ -67006,7 +69269,7 @@ function clone(value) {
 
 module.exports = clone;
 
-},{"./_baseClone":64}],208:[function(_dereq_,module,exports){
+},{"./_baseClone":72}],216:[function(_dereq_,module,exports){
 var baseClone = _dereq_('./_baseClone');
 
 /** Used to compose bitmasks for cloning. */
@@ -67037,7 +69300,7 @@ function cloneDeep(value) {
 
 module.exports = cloneDeep;
 
-},{"./_baseClone":64}],209:[function(_dereq_,module,exports){
+},{"./_baseClone":72}],217:[function(_dereq_,module,exports){
 /**
  * Creates a function that returns `value`.
  *
@@ -67065,7 +69328,7 @@ function constant(value) {
 
 module.exports = constant;
 
-},{}],210:[function(_dereq_,module,exports){
+},{}],218:[function(_dereq_,module,exports){
 var deburrLetter = _dereq_('./_deburrLetter'),
     toString = _dereq_('./toString');
 
@@ -67112,7 +69375,7 @@ function deburr(string) {
 
 module.exports = deburr;
 
-},{"./_deburrLetter":129,"./toString":259}],211:[function(_dereq_,module,exports){
+},{"./_deburrLetter":137,"./toString":267}],219:[function(_dereq_,module,exports){
 var baseDifference = _dereq_('./_baseDifference'),
     baseFlatten = _dereq_('./_baseFlatten'),
     baseRest = _dereq_('./_baseRest'),
@@ -67147,10 +69410,10 @@ var difference = baseRest(function(array, values) {
 
 module.exports = difference;
 
-},{"./_baseDifference":66,"./_baseFlatten":70,"./_baseRest":100,"./isArrayLikeObject":223}],212:[function(_dereq_,module,exports){
+},{"./_baseDifference":74,"./_baseFlatten":78,"./_baseRest":108,"./isArrayLikeObject":231}],220:[function(_dereq_,module,exports){
 module.exports = _dereq_('./forEach');
 
-},{"./forEach":215}],213:[function(_dereq_,module,exports){
+},{"./forEach":223}],221:[function(_dereq_,module,exports){
 /**
  * Performs a
  * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
@@ -67189,7 +69452,7 @@ function eq(value, other) {
 
 module.exports = eq;
 
-},{}],214:[function(_dereq_,module,exports){
+},{}],222:[function(_dereq_,module,exports){
 var arrayFilter = _dereq_('./_arrayFilter'),
     baseFilter = _dereq_('./_baseFilter'),
     baseIteratee = _dereq_('./_baseIteratee'),
@@ -67239,7 +69502,7 @@ function filter(collection, predicate) {
 
 module.exports = filter;
 
-},{"./_arrayFilter":47,"./_baseFilter":68,"./_baseIteratee":87,"./isArray":221}],215:[function(_dereq_,module,exports){
+},{"./_arrayFilter":55,"./_baseFilter":76,"./_baseIteratee":95,"./isArray":229}],223:[function(_dereq_,module,exports){
 var arrayEach = _dereq_('./_arrayEach'),
     baseEach = _dereq_('./_baseEach'),
     castFunction = _dereq_('./_castFunction'),
@@ -67282,7 +69545,7 @@ function forEach(collection, iteratee) {
 
 module.exports = forEach;
 
-},{"./_arrayEach":46,"./_baseEach":67,"./_castFunction":108,"./isArray":221}],216:[function(_dereq_,module,exports){
+},{"./_arrayEach":54,"./_baseEach":75,"./_castFunction":116,"./isArray":229}],224:[function(_dereq_,module,exports){
 var baseGet = _dereq_('./_baseGet');
 
 /**
@@ -67317,7 +69580,7 @@ function get(object, path, defaultValue) {
 
 module.exports = get;
 
-},{"./_baseGet":73}],217:[function(_dereq_,module,exports){
+},{"./_baseGet":81}],225:[function(_dereq_,module,exports){
 var baseAssignValue = _dereq_('./_baseAssignValue'),
     createAggregator = _dereq_('./_createAggregator');
 
@@ -67360,7 +69623,7 @@ var groupBy = createAggregator(function(result, value, key) {
 
 module.exports = groupBy;
 
-},{"./_baseAssignValue":63,"./_createAggregator":122}],218:[function(_dereq_,module,exports){
+},{"./_baseAssignValue":71,"./_createAggregator":130}],226:[function(_dereq_,module,exports){
 var baseHasIn = _dereq_('./_baseHasIn'),
     hasPath = _dereq_('./_hasPath');
 
@@ -67396,7 +69659,7 @@ function hasIn(object, path) {
 
 module.exports = hasIn;
 
-},{"./_baseHasIn":76,"./_hasPath":146}],219:[function(_dereq_,module,exports){
+},{"./_baseHasIn":84,"./_hasPath":154}],227:[function(_dereq_,module,exports){
 /**
  * This method returns the first argument it receives.
  *
@@ -67419,7 +69682,7 @@ function identity(value) {
 
 module.exports = identity;
 
-},{}],220:[function(_dereq_,module,exports){
+},{}],228:[function(_dereq_,module,exports){
 var baseIsArguments = _dereq_('./_baseIsArguments'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -67457,7 +69720,7 @@ var isArguments = baseIsArguments(function() { return arguments; }()) ? baseIsAr
 
 module.exports = isArguments;
 
-},{"./_baseIsArguments":78,"./isObjectLike":235}],221:[function(_dereq_,module,exports){
+},{"./_baseIsArguments":86,"./isObjectLike":243}],229:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is classified as an `Array` object.
  *
@@ -67485,7 +69748,7 @@ var isArray = Array.isArray;
 
 module.exports = isArray;
 
-},{}],222:[function(_dereq_,module,exports){
+},{}],230:[function(_dereq_,module,exports){
 var isFunction = _dereq_('./isFunction'),
     isLength = _dereq_('./isLength');
 
@@ -67520,7 +69783,7 @@ function isArrayLike(value) {
 
 module.exports = isArrayLike;
 
-},{"./isFunction":228,"./isLength":229}],223:[function(_dereq_,module,exports){
+},{"./isFunction":236,"./isLength":237}],231:[function(_dereq_,module,exports){
 var isArrayLike = _dereq_('./isArrayLike'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -67555,7 +69818,7 @@ function isArrayLikeObject(value) {
 
 module.exports = isArrayLikeObject;
 
-},{"./isArrayLike":222,"./isObjectLike":235}],224:[function(_dereq_,module,exports){
+},{"./isArrayLike":230,"./isObjectLike":243}],232:[function(_dereq_,module,exports){
 var root = _dereq_('./_root'),
     stubFalse = _dereq_('./stubFalse');
 
@@ -67595,7 +69858,7 @@ var isBuffer = nativeIsBuffer || stubFalse;
 
 module.exports = isBuffer;
 
-},{"./_root":185,"./stubFalse":255}],225:[function(_dereq_,module,exports){
+},{"./_root":193,"./stubFalse":263}],233:[function(_dereq_,module,exports){
 var baseKeys = _dereq_('./_baseKeys'),
     getTag = _dereq_('./_getTag'),
     isArguments = _dereq_('./isArguments'),
@@ -67674,7 +69937,7 @@ function isEmpty(value) {
 
 module.exports = isEmpty;
 
-},{"./_baseKeys":88,"./_getTag":144,"./_isPrototype":163,"./isArguments":220,"./isArray":221,"./isArrayLike":222,"./isBuffer":224,"./isTypedArray":239}],226:[function(_dereq_,module,exports){
+},{"./_baseKeys":96,"./_getTag":152,"./_isPrototype":171,"./isArguments":228,"./isArray":229,"./isArrayLike":230,"./isBuffer":232,"./isTypedArray":247}],234:[function(_dereq_,module,exports){
 var baseIsEqual = _dereq_('./_baseIsEqual');
 
 /**
@@ -67711,7 +69974,7 @@ function isEqual(value, other) {
 
 module.exports = isEqual;
 
-},{"./_baseIsEqual":79}],227:[function(_dereq_,module,exports){
+},{"./_baseIsEqual":87}],235:[function(_dereq_,module,exports){
 var root = _dereq_('./_root');
 
 /* Built-in method references for those with the same name as other `lodash` methods. */
@@ -67749,7 +70012,7 @@ function isFinite(value) {
 
 module.exports = isFinite;
 
-},{"./_root":185}],228:[function(_dereq_,module,exports){
+},{"./_root":193}],236:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     isObject = _dereq_('./isObject');
 
@@ -67788,7 +70051,7 @@ function isFunction(value) {
 
 module.exports = isFunction;
 
-},{"./_baseGetTag":75,"./isObject":234}],229:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./isObject":242}],237:[function(_dereq_,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -67825,7 +70088,7 @@ function isLength(value) {
 
 module.exports = isLength;
 
-},{}],230:[function(_dereq_,module,exports){
+},{}],238:[function(_dereq_,module,exports){
 var baseIsMap = _dereq_('./_baseIsMap'),
     baseUnary = _dereq_('./_baseUnary'),
     nodeUtil = _dereq_('./_nodeUtil');
@@ -67854,7 +70117,7 @@ var isMap = nodeIsMap ? baseUnary(nodeIsMap) : baseIsMap;
 
 module.exports = isMap;
 
-},{"./_baseIsMap":81,"./_baseUnary":106,"./_nodeUtil":181}],231:[function(_dereq_,module,exports){
+},{"./_baseIsMap":89,"./_baseUnary":114,"./_nodeUtil":189}],239:[function(_dereq_,module,exports){
 var isNumber = _dereq_('./isNumber');
 
 /**
@@ -67894,7 +70157,7 @@ function isNaN(value) {
 
 module.exports = isNaN;
 
-},{"./isNumber":233}],232:[function(_dereq_,module,exports){
+},{"./isNumber":241}],240:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is `null` or `undefined`.
  *
@@ -67921,7 +70184,7 @@ function isNil(value) {
 
 module.exports = isNil;
 
-},{}],233:[function(_dereq_,module,exports){
+},{}],241:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -67961,7 +70224,7 @@ function isNumber(value) {
 
 module.exports = isNumber;
 
-},{"./_baseGetTag":75,"./isObjectLike":235}],234:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./isObjectLike":243}],242:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is the
  * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
@@ -67994,7 +70257,7 @@ function isObject(value) {
 
 module.exports = isObject;
 
-},{}],235:[function(_dereq_,module,exports){
+},{}],243:[function(_dereq_,module,exports){
 /**
  * Checks if `value` is object-like. A value is object-like if it's not `null`
  * and has a `typeof` result of "object".
@@ -68025,7 +70288,7 @@ function isObjectLike(value) {
 
 module.exports = isObjectLike;
 
-},{}],236:[function(_dereq_,module,exports){
+},{}],244:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     getPrototype = _dereq_('./_getPrototype'),
     isObjectLike = _dereq_('./isObjectLike');
@@ -68089,7 +70352,7 @@ function isPlainObject(value) {
 
 module.exports = isPlainObject;
 
-},{"./_baseGetTag":75,"./_getPrototype":140,"./isObjectLike":235}],237:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./_getPrototype":148,"./isObjectLike":243}],245:[function(_dereq_,module,exports){
 var baseIsSet = _dereq_('./_baseIsSet'),
     baseUnary = _dereq_('./_baseUnary'),
     nodeUtil = _dereq_('./_nodeUtil');
@@ -68118,7 +70381,7 @@ var isSet = nodeIsSet ? baseUnary(nodeIsSet) : baseIsSet;
 
 module.exports = isSet;
 
-},{"./_baseIsSet":85,"./_baseUnary":106,"./_nodeUtil":181}],238:[function(_dereq_,module,exports){
+},{"./_baseIsSet":93,"./_baseUnary":114,"./_nodeUtil":189}],246:[function(_dereq_,module,exports){
 var baseGetTag = _dereq_('./_baseGetTag'),
     isObjectLike = _dereq_('./isObjectLike');
 
@@ -68149,7 +70412,7 @@ function isSymbol(value) {
 
 module.exports = isSymbol;
 
-},{"./_baseGetTag":75,"./isObjectLike":235}],239:[function(_dereq_,module,exports){
+},{"./_baseGetTag":83,"./isObjectLike":243}],247:[function(_dereq_,module,exports){
 var baseIsTypedArray = _dereq_('./_baseIsTypedArray'),
     baseUnary = _dereq_('./_baseUnary'),
     nodeUtil = _dereq_('./_nodeUtil');
@@ -68178,7 +70441,7 @@ var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedA
 
 module.exports = isTypedArray;
 
-},{"./_baseIsTypedArray":86,"./_baseUnary":106,"./_nodeUtil":181}],240:[function(_dereq_,module,exports){
+},{"./_baseIsTypedArray":94,"./_baseUnary":114,"./_nodeUtil":189}],248:[function(_dereq_,module,exports){
 var arrayLikeKeys = _dereq_('./_arrayLikeKeys'),
     baseKeys = _dereq_('./_baseKeys'),
     isArrayLike = _dereq_('./isArrayLike');
@@ -68217,7 +70480,7 @@ function keys(object) {
 
 module.exports = keys;
 
-},{"./_arrayLikeKeys":50,"./_baseKeys":88,"./isArrayLike":222}],241:[function(_dereq_,module,exports){
+},{"./_arrayLikeKeys":58,"./_baseKeys":96,"./isArrayLike":230}],249:[function(_dereq_,module,exports){
 var arrayLikeKeys = _dereq_('./_arrayLikeKeys'),
     baseKeysIn = _dereq_('./_baseKeysIn'),
     isArrayLike = _dereq_('./isArrayLike');
@@ -68251,7 +70514,7 @@ function keysIn(object) {
 
 module.exports = keysIn;
 
-},{"./_arrayLikeKeys":50,"./_baseKeysIn":89,"./isArrayLike":222}],242:[function(_dereq_,module,exports){
+},{"./_arrayLikeKeys":58,"./_baseKeysIn":97,"./isArrayLike":230}],250:[function(_dereq_,module,exports){
 (function (global){
 /**
  * @license
@@ -85360,7 +87623,7 @@ module.exports = keysIn;
 }.call(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],243:[function(_dereq_,module,exports){
+},{}],251:[function(_dereq_,module,exports){
 var arrayMap = _dereq_('./_arrayMap'),
     baseIteratee = _dereq_('./_baseIteratee'),
     baseMap = _dereq_('./_baseMap'),
@@ -85415,7 +87678,7 @@ function map(collection, iteratee) {
 
 module.exports = map;
 
-},{"./_arrayMap":51,"./_baseIteratee":87,"./_baseMap":90,"./isArray":221}],244:[function(_dereq_,module,exports){
+},{"./_arrayMap":59,"./_baseIteratee":95,"./_baseMap":98,"./isArray":229}],252:[function(_dereq_,module,exports){
 var baseAssignValue = _dereq_('./_baseAssignValue'),
     baseForOwn = _dereq_('./_baseForOwn'),
     baseIteratee = _dereq_('./_baseIteratee');
@@ -85460,7 +87723,7 @@ function mapValues(object, iteratee) {
 
 module.exports = mapValues;
 
-},{"./_baseAssignValue":63,"./_baseForOwn":72,"./_baseIteratee":87}],245:[function(_dereq_,module,exports){
+},{"./_baseAssignValue":71,"./_baseForOwn":80,"./_baseIteratee":95}],253:[function(_dereq_,module,exports){
 var MapCache = _dereq_('./_MapCache');
 
 /** Error message constants. */
@@ -85535,7 +87798,7 @@ memoize.Cache = MapCache;
 
 module.exports = memoize;
 
-},{"./_MapCache":36}],246:[function(_dereq_,module,exports){
+},{"./_MapCache":44}],254:[function(_dereq_,module,exports){
 var baseMerge = _dereq_('./_baseMerge'),
     createAssigner = _dereq_('./_createAssigner');
 
@@ -85576,7 +87839,7 @@ var merge = createAssigner(function(object, source, srcIndex) {
 
 module.exports = merge;
 
-},{"./_baseMerge":93,"./_createAssigner":123}],247:[function(_dereq_,module,exports){
+},{"./_baseMerge":101,"./_createAssigner":131}],255:[function(_dereq_,module,exports){
 /** Error message constants. */
 var FUNC_ERROR_TEXT = 'Expected a function';
 
@@ -85618,7 +87881,7 @@ function negate(predicate) {
 
 module.exports = negate;
 
-},{}],248:[function(_dereq_,module,exports){
+},{}],256:[function(_dereq_,module,exports){
 var baseIteratee = _dereq_('./_baseIteratee'),
     negate = _dereq_('./negate'),
     pickBy = _dereq_('./pickBy');
@@ -85649,7 +87912,7 @@ function omitBy(object, predicate) {
 
 module.exports = omitBy;
 
-},{"./_baseIteratee":87,"./negate":247,"./pickBy":249}],249:[function(_dereq_,module,exports){
+},{"./_baseIteratee":95,"./negate":255,"./pickBy":257}],257:[function(_dereq_,module,exports){
 var arrayMap = _dereq_('./_arrayMap'),
     baseIteratee = _dereq_('./_baseIteratee'),
     basePickBy = _dereq_('./_basePickBy'),
@@ -85688,7 +87951,7 @@ function pickBy(object, predicate) {
 
 module.exports = pickBy;
 
-},{"./_arrayMap":51,"./_baseIteratee":87,"./_basePickBy":95,"./_getAllKeysIn":136}],250:[function(_dereq_,module,exports){
+},{"./_arrayMap":59,"./_baseIteratee":95,"./_basePickBy":103,"./_getAllKeysIn":144}],258:[function(_dereq_,module,exports){
 var baseProperty = _dereq_('./_baseProperty'),
     basePropertyDeep = _dereq_('./_basePropertyDeep'),
     isKey = _dereq_('./_isKey'),
@@ -85722,7 +87985,7 @@ function property(path) {
 
 module.exports = property;
 
-},{"./_baseProperty":96,"./_basePropertyDeep":97,"./_isKey":160,"./_toKey":200}],251:[function(_dereq_,module,exports){
+},{"./_baseProperty":104,"./_basePropertyDeep":105,"./_isKey":168,"./_toKey":208}],259:[function(_dereq_,module,exports){
 var createRange = _dereq_('./_createRange');
 
 /**
@@ -85770,7 +88033,7 @@ var range = createRange();
 
 module.exports = range;
 
-},{"./_createRange":128}],252:[function(_dereq_,module,exports){
+},{"./_createRange":136}],260:[function(_dereq_,module,exports){
 var arrayFilter = _dereq_('./_arrayFilter'),
     baseFilter = _dereq_('./_baseFilter'),
     baseIteratee = _dereq_('./_baseIteratee'),
@@ -85818,7 +88081,7 @@ function reject(collection, predicate) {
 
 module.exports = reject;
 
-},{"./_arrayFilter":47,"./_baseFilter":68,"./_baseIteratee":87,"./isArray":221,"./negate":247}],253:[function(_dereq_,module,exports){
+},{"./_arrayFilter":55,"./_baseFilter":76,"./_baseIteratee":95,"./isArray":229,"./negate":255}],261:[function(_dereq_,module,exports){
 var baseSet = _dereq_('./_baseSet');
 
 /**
@@ -85855,7 +88118,7 @@ function set(object, path, value) {
 
 module.exports = set;
 
-},{"./_baseSet":101}],254:[function(_dereq_,module,exports){
+},{"./_baseSet":109}],262:[function(_dereq_,module,exports){
 /**
  * This method returns a new empty array.
  *
@@ -85880,7 +88143,7 @@ function stubArray() {
 
 module.exports = stubArray;
 
-},{}],255:[function(_dereq_,module,exports){
+},{}],263:[function(_dereq_,module,exports){
 /**
  * This method returns `false`.
  *
@@ -85900,7 +88163,7 @@ function stubFalse() {
 
 module.exports = stubFalse;
 
-},{}],256:[function(_dereq_,module,exports){
+},{}],264:[function(_dereq_,module,exports){
 var toNumber = _dereq_('./toNumber');
 
 /** Used as references for various `Number` constants. */
@@ -85944,7 +88207,7 @@ function toFinite(value) {
 
 module.exports = toFinite;
 
-},{"./toNumber":257}],257:[function(_dereq_,module,exports){
+},{"./toNumber":265}],265:[function(_dereq_,module,exports){
 var isObject = _dereq_('./isObject'),
     isSymbol = _dereq_('./isSymbol');
 
@@ -86012,7 +88275,7 @@ function toNumber(value) {
 
 module.exports = toNumber;
 
-},{"./isObject":234,"./isSymbol":238}],258:[function(_dereq_,module,exports){
+},{"./isObject":242,"./isSymbol":246}],266:[function(_dereq_,module,exports){
 var copyObject = _dereq_('./_copyObject'),
     keysIn = _dereq_('./keysIn');
 
@@ -86046,7 +88309,7 @@ function toPlainObject(value) {
 
 module.exports = toPlainObject;
 
-},{"./_copyObject":118,"./keysIn":241}],259:[function(_dereq_,module,exports){
+},{"./_copyObject":126,"./keysIn":249}],267:[function(_dereq_,module,exports){
 var baseToString = _dereq_('./_baseToString');
 
 /**
@@ -86076,7 +88339,7 @@ function toString(value) {
 
 module.exports = toString;
 
-},{"./_baseToString":105}],260:[function(_dereq_,module,exports){
+},{"./_baseToString":113}],268:[function(_dereq_,module,exports){
 var createCaseFirst = _dereq_('./_createCaseFirst');
 
 /**
@@ -86100,7 +88363,7 @@ var upperFirst = createCaseFirst('toUpperCase');
 
 module.exports = upperFirst;
 
-},{"./_createCaseFirst":126}],261:[function(_dereq_,module,exports){
+},{"./_createCaseFirst":134}],269:[function(_dereq_,module,exports){
 var baseDifference = _dereq_('./_baseDifference'),
     baseRest = _dereq_('./_baseRest'),
     isArrayLikeObject = _dereq_('./isArrayLikeObject');
@@ -86133,7 +88396,7 @@ var without = baseRest(function(array, values) {
 
 module.exports = without;
 
-},{"./_baseDifference":66,"./_baseRest":100,"./isArrayLikeObject":223}],262:[function(_dereq_,module,exports){
+},{"./_baseDifference":74,"./_baseRest":108,"./isArrayLikeObject":231}],270:[function(_dereq_,module,exports){
 var asciiWords = _dereq_('./_asciiWords'),
     hasUnicodeWord = _dereq_('./_hasUnicodeWord'),
     toString = _dereq_('./toString'),
@@ -86170,7 +88433,7 @@ function words(string, pattern, guard) {
 
 module.exports = words;
 
-},{"./_asciiWords":56,"./_hasUnicodeWord":148,"./_unicodeWords":203,"./toString":259}],263:[function(_dereq_,module,exports){
+},{"./_asciiWords":64,"./_hasUnicodeWord":156,"./_unicodeWords":211,"./toString":267}],271:[function(_dereq_,module,exports){
 //! moment.js
 
 ;(function (global, factory) {
@@ -87645,9 +89908,9 @@ module.exports = words;
 
             mom = createUTC([2000, 1]).day(i);
             if (strict && !this._fullWeekdaysParse[i]) {
-                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\.?') + '$', 'i');
-                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\.?') + '$', 'i');
-                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\.?') + '$', 'i');
+                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\\.?') + '$', 'i');
+                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\\.?') + '$', 'i');
+                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\\.?') + '$', 'i');
             }
             if (!this._weekdaysParse[i]) {
                 regex = '^' + this.weekdays(mom, '') + '|^' + this.weekdaysShort(mom, '') + '|^' + this.weekdaysMin(mom, '');
@@ -88450,7 +90713,7 @@ module.exports = words;
 
     function preprocessRFC2822(s) {
         // Remove comments and folding whitespace and replace multiple-spaces with a single space
-        return s.replace(/\([^)]*\)|[\n\t]/g, ' ').replace(/(\s\s+)/g, ' ').trim();
+        return s.replace(/\([^)]*\)|[\n\t]/g, ' ').replace(/(\s\s+)/g, ' ').replace(/^\s\s*/, '').replace(/\s\s*$/, '');
     }
 
     function checkWeekday(weekdayStr, parsedInput, config) {
@@ -90629,7 +92892,7 @@ module.exports = words;
     // Side effect imports
 
 
-    hooks.version = '2.22.1';
+    hooks.version = '2.22.2';
 
     setHookCallback(createLocal);
 
@@ -90678,7 +92941,7 @@ module.exports = words;
 
 })));
 
-},{}],264:[function(_dereq_,module,exports){
+},{}],272:[function(_dereq_,module,exports){
 (function (global,setImmediate){
 /*! Native Promise Only
     v0.8.1 (c) Kyle Simpson
@@ -91055,7 +93318,7 @@ module.exports = words;
 });
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},_dereq_("timers").setImmediate)
-},{"timers":353}],265:[function(_dereq_,module,exports){
+},{"timers":350}],273:[function(_dereq_,module,exports){
 /*
  * ngDialog - easy modals and popup windows
  * http://github.com/likeastore/ngDialog
@@ -92010,7 +94273,7 @@ module.exports = words;
     return m;
 }));
 
-},{"angular":10}],266:[function(_dereq_,module,exports){
+},{"angular":11}],274:[function(_dereq_,module,exports){
 /**!
  * AngularJS file upload directives and services. Supports: file upload/drop/paste, resume, cancel/abort,
  * progress, resize, thumbnail, preview, validation and CORS
@@ -94910,1733 +97173,10 @@ ngFileUpload.service('UploadExif', ['UploadResize', '$q', function (UploadResize
 }]);
 
 
-},{}],267:[function(_dereq_,module,exports){
+},{}],275:[function(_dereq_,module,exports){
 _dereq_('./dist/ng-file-upload-all');
 module.exports = 'ngFileUpload';
-},{"./dist/ng-file-upload-all":266}],268:[function(_dereq_,module,exports){
-(function (root, factory) {
-  // AMD
-  if (typeof define === 'function' && define.amd) define(['angular'], factory);
-  // Global
-  else factory(angular);
-}(this, function (angular) {
-
-  angular
-  .module('ckeditor', [])
-  .directive('ckeditor', ['$parse', ckeditorDirective]);
-
-  // Polyfill setImmediate function.
-  var setImmediate = window && window.setImmediate ? window.setImmediate : function (fn) {
-    setTimeout(fn, 0);
-  };
-
-  /**
-   * CKEditor directive.
-   *
-   * @example
-   * <div ckeditor="options" ng-model="content" ready="onReady()"></div>
-   */
-
-  function ckeditorDirective($parse) {
-    return {
-      restrict: 'A',
-      require: ['ckeditor', 'ngModel'],
-      controller: [
-        '$scope',
-        '$element',
-        '$attrs',
-        '$parse',
-        '$q',
-        ckeditorController
-      ],
-      link: function (scope, element, attrs, ctrls) {
-        // get needed controllers
-        var controller = ctrls[0]; // our own, see below
-        var ngModelController = ctrls[1];
-
-        // Initialize the editor content when it is ready.
-        controller.ready().then(function initialize() {
-          // Sync view on specific events.
-          ['dataReady', 'change', 'blur', 'saveSnapshot'].forEach(function (event) {
-            controller.onCKEvent(event, function syncView() {
-              ngModelController.$setViewValue(controller.instance.getData() || '');
-            });
-          });
-
-          controller.instance.setReadOnly(!! attrs.readonly);
-          attrs.$observe('readonly', function (readonly) {
-            controller.instance.setReadOnly(!! readonly);
-          });
-
-          // Defer the ready handler calling to ensure that the editor is
-          // completely ready and populated with data.
-          setImmediate(function () {
-            $parse(attrs.ready)(scope);
-          });
-        });
-
-        // Set editor data when view data change.
-        ngModelController.$render = function syncEditor() {
-          controller.ready().then(function () {
-            // "noSnapshot" prevent recording an undo snapshot
-            controller.instance.setData(ngModelController.$viewValue || '', {
-              noSnapshot: true,
-              callback: function () {
-                // Amends the top of the undo stack with the current DOM changes
-                // ie: merge snapshot with the first empty one
-                // http://docs.ckeditor.com/#!/api/CKEDITOR.editor-event-updateSnapshot
-                controller.instance.fire('updateSnapshot');
-              }
-            });
-          });
-        };
-      }
-    };
-  }
-
-  /**
-   * CKEditor controller.
-   */
-
-  function ckeditorController($scope, $element, $attrs, $parse, $q) {
-    var config = $parse($attrs.ckeditor)($scope) || {};
-    var editorElement = $element[0];
-    var instance;
-    var readyDeferred = $q.defer(); // a deferred to be resolved when the editor is ready
-
-    // Create editor instance.
-    if (editorElement.hasAttribute('contenteditable') &&
-        editorElement.getAttribute('contenteditable').toLowerCase() == 'true') {
-      instance = this.instance = CKEDITOR.inline(editorElement, config);
-    }
-    else {
-      instance = this.instance = CKEDITOR.replace(editorElement, config);
-    }
-
-    /**
-     * Listen on events of a given type.
-     * This make all event asynchronous and wrapped in $scope.$apply.
-     *
-     * @param {String} event
-     * @param {Function} listener
-     * @returns {Function} Deregistration function for this listener.
-     */
-
-    this.onCKEvent = function (event, listener) {
-      instance.on(event, asyncListener);
-
-      function asyncListener() {
-        var args = arguments;
-        setImmediate(function () {
-          applyListener.apply(null, args);
-        });
-      }
-
-      function applyListener() {
-        var args = arguments;
-        $scope.$apply(function () {
-          listener.apply(null, args);
-        });
-      }
-
-      // Return the deregistration function
-      return function $off() {
-        instance.removeListener(event, applyListener);
-      };
-    };
-
-    this.onCKEvent('instanceReady', function() {
-      readyDeferred.resolve(true);
-    });
-
-    /**
-     * Check if the editor if ready.
-     *
-     * @returns {Promise}
-     */
-    this.ready = function ready() {
-      return readyDeferred.promise;
-    };
-
-    // Destroy editor when the scope is destroyed.
-    $scope.$on('$destroy', function onDestroy() {
-      // do not delete too fast or pending events will throw errors
-      readyDeferred.promise.then(function() {
-        instance.destroy(false);
-      });
-    });
-  }
-}));
-
-},{}],269:[function(_dereq_,module,exports){
-(function (global){
-'use strict';
-// Intentionally use native-promise-only here... Other promise libraries (es6-promise)
-// duck-punch the global Promise definition which messes up Angular 2 since it
-// also duck-punches the global Promise definition. For now, keep native-promise-only.
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-var _nativePromiseOnly = _dereq_('native-promise-only');
-
-var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
-
-_dereq_('whatwg-fetch');
-
-var _eventemitter = _dereq_('eventemitter2');
-
-var _browserCookies = _dereq_('browser-cookies');
-
-var _browserCookies2 = _interopRequireDefault(_browserCookies);
-
-var _shallowCopy = _dereq_('shallow-copy');
-
-var _shallowCopy2 = _interopRequireDefault(_shallowCopy);
-
-var _providers = _dereq_('./providers');
-
-var _providers2 = _interopRequireDefault(_providers);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-var isBoolean = function isBoolean(val) {
-  return (typeof val === 'undefined' ? 'undefined' : _typeof(val)) === _typeof(true);
-};
-var isNil = function isNil(val) {
-  return val === null || val === undefined;
-};
-var isObject = function isObject(val) {
-  return val && (typeof val === 'undefined' ? 'undefined' : _typeof(val)) === 'object';
-};
-
-/**
- * The Formio interface class.
- *
- *   let formio = new Formio('https://examples.form.io/example');
- */
-
-var Formio = function () {
-  /* eslint-disable max-statements */
-  function Formio(path) {
-    var _this = this;
-
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-
-    _classCallCheck(this, Formio);
-
-    // Ensure we have an instance of Formio.
-    if (!(this instanceof Formio)) {
-      return new Formio(path);
-    }
-
-    // Initialize our variables.
-    this.base = '';
-    this.projectsUrl = '';
-    this.projectUrl = '';
-    this.projectId = '';
-    this.formUrl = '';
-    this.formsUrl = '';
-    this.formId = '';
-    this.submissionsUrl = '';
-    this.submissionUrl = '';
-    this.submissionId = '';
-    this.actionsUrl = '';
-    this.actionId = '';
-    this.actionUrl = '';
-    this.vsUrl = '';
-    this.vId = '';
-    this.vUrl = '';
-    this.query = '';
-
-    if (options.hasOwnProperty('base')) {
-      this.base = options.base;
-    } else if (Formio.baseUrl) {
-      this.base = Formio.baseUrl;
-    } else {
-      this.base = window.location.href.match(/http[s]?:\/\/api./)[0];
-    }
-
-    if (!path) {
-      // Allow user to create new projects if this was instantiated without
-      // a url
-      this.projectUrl = this.base + '/project';
-      this.projectsUrl = this.base + '/project';
-      this.projectId = false;
-      this.query = '';
-      return;
-    }
-
-    if (options.hasOwnProperty('project')) {
-      this.projectUrl = options.project;
-    }
-
-    var project = this.projectUrl || Formio.projectUrl;
-
-    // The baseURL is the same as the projectUrl. This is almost certainly against
-    // the Open Source server.
-    if (project && this.base === project) {
-      this.noProject = true;
-      this.projectUrl = this.base;
-    }
-
-    // Normalize to an absolute path.
-    if (path.indexOf('http') !== 0 && path.indexOf('//') !== 0) {
-      path = this.base + path;
-    }
-
-    var hostparts = this.getUrlParts(path);
-    var parts = [];
-    var hostName = hostparts[1] + hostparts[2];
-    path = hostparts.length > 3 ? hostparts[3] : '';
-    var queryparts = path.split('?');
-    if (queryparts.length > 1) {
-      path = queryparts[0];
-      this.query = '?' + queryparts[1];
-    }
-
-    // Register a specific path.
-    var registerPath = function registerPath(name, base) {
-      _this[name + 'sUrl'] = base + '/' + name;
-      var regex = new RegExp('/' + name + '/([^/]+)');
-      if (path.search(regex) !== -1) {
-        parts = path.match(regex);
-        _this[name + 'Url'] = parts ? base + parts[0] : '';
-        _this[name + 'Id'] = parts.length > 1 ? parts[1] : '';
-        base += parts[0];
-      }
-      return base;
-    };
-
-    // Register an array of items.
-    var registerItems = function registerItems(items, base, staticBase) {
-      for (var i in items) {
-        if (items.hasOwnProperty(i)) {
-          var item = items[i];
-          if (Array.isArray(item)) {
-            registerItems(item, base, true);
-          } else {
-            var newBase = registerPath(item, base);
-            base = staticBase ? base : newBase;
-          }
-        }
-      }
-    };
-
-    if (!this.projectUrl || this.projectUrl === this.base) {
-      this.projectUrl = hostName;
-    }
-
-    if (!this.noProject) {
-      // Determine the projectUrl and projectId
-      if (path.search(/(^|\/)(project)($|\/)/) !== -1) {
-        // Get project id as project/:projectId.
-        registerItems(['project'], hostName);
-      } else if (hostName === this.base) {
-        // Get project id as first part of path (subdirectory).
-        if (hostparts.length > 3 && path.split('/').length > 1) {
-          var pathParts = path.split('/');
-          pathParts.shift(); // Throw away the first /.
-          this.projectId = pathParts.shift();
-          path = '/' + pathParts.join('/');
-          this.projectUrl = hostName + '/' + this.projectId;
-        }
-      } else {
-        // Get project id from subdomain.
-        if (hostparts.length > 2 && (hostparts[2].split('.').length > 2 || hostName.indexOf('localhost') !== -1)) {
-          this.projectUrl = hostName;
-          this.projectId = hostparts[2].split('.')[0];
-        }
-      }
-      this.projectsUrl = this.projectsUrl || this.base + '/project';
-    }
-
-    // Configure Form urls and form ids.
-    if (path.search(/(^|\/)(project|form)($|\/)/) !== -1) {
-      registerItems(['form', ['submission', 'action', 'v']], this.projectUrl);
-    } else {
-      var subRegEx = new RegExp('/(submission|action|v)($|/.*)');
-      var subs = path.match(subRegEx);
-      this.pathType = subs && subs.length > 1 ? subs[1] : '';
-      path = path.replace(subRegEx, '');
-      path = path.replace(/\/$/, '');
-      this.formsUrl = this.projectUrl + '/form';
-      this.formUrl = this.projectUrl + path;
-      this.formId = path.replace(/^\/+|\/+$/g, '');
-      var items = ['submission', 'action', 'v'];
-      for (var i in items) {
-        if (items.hasOwnProperty(i)) {
-          var item = items[i];
-          this[item + 'sUrl'] = this.projectUrl + path + '/' + item;
-          if (this.pathType === item && subs.length > 2 && subs[2]) {
-            this[item + 'Id'] = subs[2].replace(/^\/+|\/+$/g, '');
-            this[item + 'Url'] = this.projectUrl + path + subs[0];
-          }
-        }
-      }
-    }
-
-    // Set the app url if it is not set.
-    if (!Formio.projectUrlSet) {
-      Formio.projectUrl = this.projectUrl;
-    }
-  }
-  /* eslint-enable max-statements */
-
-  _createClass(Formio, [{
-    key: 'delete',
-    value: function _delete(type, opts) {
-      var _id = type + 'Id';
-      var _url = type + 'Url';
-      if (!this[_id]) {
-        _nativePromiseOnly2.default.reject('Nothing to delete');
-      }
-      Formio.cache = {};
-      return this.makeRequest(type, this[_url], 'delete', null, opts);
-    }
-  }, {
-    key: 'index',
-    value: function index(type, query, opts) {
-      var _url = type + 'Url';
-      query = query || '';
-      if (query && isObject(query)) {
-        query = '?' + Formio.serialize(query.params);
-      }
-      return this.makeRequest(type, this[_url] + query, 'get', null, opts);
-    }
-  }, {
-    key: 'save',
-    value: function save(type, data, opts) {
-      var _id = type + 'Id';
-      var _url = type + 'Url';
-      var method = this[_id] || data._id ? 'put' : 'post';
-      var reqUrl = this[_id] ? this[_url] : this[type + 'sUrl'];
-      if (!this[_id] && data._id && method === 'put' && !(reqUrl.indexOf(data._id) !== -1)) {
-        reqUrl += '/' + data._id;
-      }
-      Formio.cache = {};
-      return this.makeRequest(type, reqUrl + this.query, method, data, opts);
-    }
-  }, {
-    key: 'load',
-    value: function load(type, query, opts) {
-      var _id = type + 'Id';
-      var _url = type + 'Url';
-      if (query && isObject(query)) {
-        query = Formio.serialize(query.params);
-      }
-      if (query) {
-        query = this.query ? this.query + '&' + query : '?' + query;
-      } else {
-        query = this.query;
-      }
-      if (!this[_id]) {
-        return _nativePromiseOnly2.default.reject('Missing ' + _id);
-      }
-      return this.makeRequest(type, this[_url] + query, 'get', null, opts);
-    }
-  }, {
-    key: 'makeRequest',
-    value: function makeRequest() {
-      for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-        args[_key] = arguments[_key];
-      }
-
-      return Formio.makeRequest.apply(Formio, [this].concat(args));
-    }
-  }, {
-    key: 'loadProject',
-    value: function loadProject(query, opts) {
-      return this.load('project', query, opts);
-    }
-  }, {
-    key: 'saveProject',
-    value: function saveProject(data, opts) {
-      return this.save('project', data, opts);
-    }
-  }, {
-    key: 'deleteProject',
-    value: function deleteProject(opts) {
-      return this.delete('project', opts);
-    }
-  }, {
-    key: 'loadForm',
-    value: function loadForm(query, opts) {
-      var _this2 = this;
-
-      return this.load('form', query, opts).then(function (currentForm) {
-        // Check to see if there isn't a number in vId.
-        if (!currentForm.revisions || isNaN(parseInt(_this2.vId))) {
-          return currentForm;
-        }
-        // If a submission already exists but form is marked to load current version of form.
-        if (currentForm.revisions === 'current' && _this2.submissionId) {
-          return currentForm;
-        }
-        // If they specified a revision form, load the revised form components.
-        if (query && isObject(query)) {
-          query = Formio.serialize(query.params);
-        }
-        if (query) {
-          query = _this2.query ? _this2.query + '&' + query : '?' + query;
-        } else {
-          query = _this2.query;
-        }
-        return _this2.makeRequest('form', _this2.vUrl + query, 'get', null, opts).then(function (revisionForm) {
-          currentForm.components = revisionForm.components;
-          // Using object.assign so we don't cross polinate multiple form loads.
-          return Object.assign({}, currentForm);
-        })
-        // If we couldn't load the revision, just return the original form.
-        .catch(function () {
-          return Object.assign({}, currentForm);
-        });
-      });
-    }
-  }, {
-    key: 'saveForm',
-    value: function saveForm(data, opts) {
-      return this.save('form', data, opts);
-    }
-  }, {
-    key: 'deleteForm',
-    value: function deleteForm(opts) {
-      return this.delete('form', opts);
-    }
-  }, {
-    key: 'loadForms',
-    value: function loadForms(query, opts) {
-      return this.index('forms', query, opts);
-    }
-  }, {
-    key: 'loadSubmission',
-    value: function loadSubmission(query, opts) {
-      var _this3 = this;
-
-      return this.load('submission', query, opts).then(function (submission) {
-        _this3.vId = submission._fvid;
-        _this3.vUrl = _this3.formUrl + '/v/' + _this3.vId;
-        return submission;
-      });
-    }
-  }, {
-    key: 'saveSubmission',
-    value: function saveSubmission(data, opts) {
-      if (!isNaN(parseInt(this.vId))) {
-        data._fvid = this.vId;
-      }
-      return this.save('submission', data, opts);
-    }
-  }, {
-    key: 'deleteSubmission',
-    value: function deleteSubmission(opts) {
-      return this.delete('submission', opts);
-    }
-  }, {
-    key: 'loadSubmissions',
-    value: function loadSubmissions(query, opts) {
-      return this.index('submissions', query, opts);
-    }
-  }, {
-    key: 'loadAction',
-    value: function loadAction(query, opts) {
-      return this.load('action', query, opts);
-    }
-  }, {
-    key: 'saveAction',
-    value: function saveAction(data, opts) {
-      return this.save('action', data, opts);
-    }
-  }, {
-    key: 'deleteAction',
-    value: function deleteAction(opts) {
-      return this.delete('action', opts);
-    }
-  }, {
-    key: 'loadActions',
-    value: function loadActions(query, opts) {
-      return this.index('actions', query, opts);
-    }
-  }, {
-    key: 'availableActions',
-    value: function availableActions() {
-      return this.makeRequest('availableActions', this.formUrl + '/actions');
-    }
-  }, {
-    key: 'actionInfo',
-    value: function actionInfo(name) {
-      return this.makeRequest('actionInfo', this.formUrl + '/actions/' + name);
-    }
-  }, {
-    key: 'isObjectId',
-    value: function isObjectId(id) {
-      var checkForHexRegExp = new RegExp('^[0-9a-fA-F]{24}$');
-      return checkForHexRegExp.test(id);
-    }
-  }, {
-    key: 'getProjectId',
-    value: function getProjectId() {
-      if (!this.projectId) {
-        return _nativePromiseOnly2.default.resolve('');
-      }
-      if (this.isObjectId(this.projectId)) {
-        return _nativePromiseOnly2.default.resolve(this.projectId);
-      } else {
-        return this.loadProject().then(function (project) {
-          return project._id;
-        });
-      }
-    }
-  }, {
-    key: 'getFormId',
-    value: function getFormId() {
-      if (!this.formId) {
-        return _nativePromiseOnly2.default.resolve('');
-      }
-      if (this.isObjectId(this.formId)) {
-        return _nativePromiseOnly2.default.resolve(this.formId);
-      } else {
-        return this.loadForm().then(function (form) {
-          return form._id;
-        });
-      }
-    }
-  }, {
-    key: 'currentUser',
-    value: function currentUser(options) {
-      return Formio.currentUser(this, options);
-    }
-  }, {
-    key: 'accessInfo',
-    value: function accessInfo() {
-      return Formio.accessInfo(this);
-    }
-
-    /**
-     * Returns the JWT token for this instance.
-     *
-     * @return {*}
-     */
-
-  }, {
-    key: 'getToken',
-    value: function getToken() {
-      return Formio.getToken();
-    }
-
-    /**
-     * Returns a temporary authentication token for single purpose token generation.
-     */
-
-  }, {
-    key: 'getTempToken',
-    value: function getTempToken(expire, allowed) {
-      var token = Formio.getToken();
-      if (!token) {
-        return _nativePromiseOnly2.default.reject('You must be authenticated to generate a temporary auth token.');
-      }
-      return this.makeRequest('tempToken', this.projectUrl + '/token', 'GET', null, {
-        ignoreCache: true,
-        header: new Headers({
-          'x-expire': expire,
-          'x-allow': allowed
-        })
-      });
-    }
-
-    /**
-     * Get a download url for a submission PDF of this submission.
-     *
-     * @return {*}
-     */
-
-  }, {
-    key: 'getDownloadUrl',
-    value: function getDownloadUrl(form) {
-      var _this4 = this;
-
-      if (!this.submissionId) {
-        return _nativePromiseOnly2.default.resolve('');
-      }
-
-      if (!form) {
-        // Make sure to load the form first.
-        return this.loadForm().then(function (_form) {
-          if (!_form) {
-            return '';
-          }
-          return _this4.getDownloadUrl(_form);
-        });
-      }
-
-      var apiUrl = '/project/' + form.project;
-      apiUrl += '/form/' + form._id;
-      apiUrl += '/submission/' + this.submissionId;
-      apiUrl += '/download';
-
-      var download = this.base + apiUrl;
-      return new _nativePromiseOnly2.default(function (resolve, reject) {
-        _this4.getTempToken(3600, 'GET:' + apiUrl).then(function (tempToken) {
-          download += '?token=' + tempToken.key;
-          resolve(download);
-        }, function () {
-          resolve(download);
-        }).catch(reject);
-      });
-    }
-  }, {
-    key: 'uploadFile',
-    value: function uploadFile(storage, file, fileName, dir, progressCallback, url) {
-      var _this5 = this;
-
-      var requestArgs = {
-        provider: storage,
-        method: 'upload',
-        file: file,
-        fileName: fileName,
-        dir: dir
-      };
-      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
-        return Formio.pluginGet('fileRequest', requestArgs).then(function (result) {
-          if (storage && isNil(result)) {
-            if (Formio.providers.storage.hasOwnProperty(storage)) {
-              var provider = new Formio.providers.storage[storage](_this5);
-              return provider.uploadFile(file, fileName, dir, progressCallback, url);
-            } else {
-              throw 'Storage provider not found';
-            }
-          }
-          return result || { url: '' };
-        });
-      });
-
-      return Formio.pluginAlter('wrapFileRequestPromise', request, requestArgs);
-    }
-  }, {
-    key: 'downloadFile',
-    value: function downloadFile(file) {
-      var _this6 = this;
-
-      var requestArgs = {
-        method: 'download',
-        file: file
-      };
-
-      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
-        return Formio.pluginGet('fileRequest', requestArgs).then(function (result) {
-          if (file.storage && isNil(result)) {
-            if (Formio.providers.storage.hasOwnProperty(file.storage)) {
-              var provider = new Formio.providers.storage[file.storage](_this6);
-              return provider.downloadFile(file);
-            } else {
-              throw 'Storage provider not found';
-            }
-          }
-          return result || { url: '' };
-        });
-      });
-
-      return Formio.pluginAlter('wrapFileRequestPromise', request, requestArgs);
-    }
-
-    // Determine if the user can submit the form.
-
-  }, {
-    key: 'canSubmit',
-    value: function canSubmit() {
-      /* eslint-disable max-statements, max-depth */
-      return _nativePromiseOnly2.default.all([this.loadForm(), this.currentUser(), this.accessInfo()]).then(function (results) {
-        var form = results.shift();
-        var user = results.shift();
-        var access = results.shift();
-
-        // Get the anonymous and admin roles.
-        var anonRole = {};
-        var adminRole = {};
-        for (var roleName in access.roles) {
-          if (access.roles.hasOwnProperty(roleName)) {
-            var role = access.roles[roleName];
-            if (role.default) {
-              anonRole = role;
-            }
-            if (role.admin) {
-              adminRole = role;
-            }
-          }
-        }
-
-        var canSubmit = false;
-        var canSubmitAnonymously = false;
-
-        // If the user is an admin, then they can submit this form.
-        if (user && user.roles.indexOf(adminRole._id) !== -1) {
-          return true;
-        }
-
-        for (var i in form.submissionAccess) {
-          if (form.submissionAccess.hasOwnProperty(i)) {
-            var subRole = form.submissionAccess[i];
-            if (subRole.type === 'create_all' || subRole.type === 'create_own') {
-              for (var j in subRole.roles) {
-                if (subRole.roles.hasOwnProperty(j)) {
-                  // Check if anonymous is allowed.
-                  if (anonRole._id === subRole.roles[j]) {
-                    canSubmitAnonymously = true;
-                  }
-                  // Check if the logged in user has the appropriate role.
-                  if (user && user.roles.indexOf(subRole.roles[j]) !== -1) {
-                    canSubmit = true;
-                    break;
-                  }
-                }
-              }
-              if (canSubmit) {
-                break;
-              }
-            }
-          }
-        }
-        // If their user cannot submit, but anonymous can, then delete token and allow submission.
-        if (!canSubmit && canSubmitAnonymously) {
-          canSubmit = true;
-          Formio.setUser(null);
-        }
-        return canSubmit;
-      });
-      /* eslint-enable max-statements, max-depth */
-    }
-  }, {
-    key: 'getUrlParts',
-    value: function getUrlParts(url) {
-      return Formio.getUrlParts(url, this);
-    }
-  }], [{
-    key: 'loadProjects',
-    value: function loadProjects(query, opts) {
-      query = query || '';
-      if (isObject(query)) {
-        query = '?' + Formio.serialize(query.params);
-      }
-      return Formio.makeStaticRequest(Formio.baseUrl + '/project' + query, 'GET', null, opts);
-    }
-  }, {
-    key: 'getUrlParts',
-    value: function getUrlParts(url, formio) {
-      var base = formio && formio.base ? formio.base : Formio.baseUrl;
-      var regex = '^(http[s]?:\\/\\/)';
-      if (base && url.indexOf(base) === 0) {
-        regex += '(' + base.replace(/^http[s]?:\/\//, '') + ')';
-      } else {
-        regex += '([^/]+)';
-      }
-      regex += '($|\\/.*)';
-      return url.match(new RegExp(regex));
-    }
-  }, {
-    key: 'serialize',
-    value: function serialize(obj) {
-      var str = [];
-      for (var p in obj) {
-        if (obj.hasOwnProperty(p)) {
-          str.push(encodeURIComponent(p) + '=' + encodeURIComponent(obj[p]));
-        }
-      }
-      return str.join('&');
-    }
-  }, {
-    key: 'getRequestArgs',
-    value: function getRequestArgs(formio, type, url, method, data, opts) {
-      method = (method || 'GET').toUpperCase();
-      if (!opts || !isObject(opts)) {
-        opts = {};
-      }
-
-      var requestArgs = {
-        url: url,
-        method: method,
-        data: data || null,
-        opts: opts
-      };
-
-      if (type) {
-        requestArgs.type = type;
-      }
-
-      if (formio) {
-        requestArgs.formio = formio;
-      }
-      return requestArgs;
-    }
-  }, {
-    key: 'makeStaticRequest',
-    value: function makeStaticRequest(url, method, data, opts) {
-      var requestArgs = Formio.getRequestArgs(null, '', url, method, data, opts);
-      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
-        return Formio.pluginGet('staticRequest', requestArgs).then(function (result) {
-          if (isNil(result)) {
-            return Formio.request(url, method, requestArgs.data, requestArgs.opts.header, requestArgs.opts);
-          }
-          return result;
-        });
-      });
-
-      return Formio.pluginAlter('wrapStaticRequestPromise', request, requestArgs);
-    }
-  }, {
-    key: 'makeRequest',
-    value: function makeRequest(formio, type, url, method, data, opts) {
-      if (!formio) {
-        return Formio.makeStaticRequest(url, method, data, opts);
-      }
-
-      var requestArgs = Formio.getRequestArgs(formio, type, url, method, data, opts);
-      var request = Formio.pluginWait('preRequest', requestArgs).then(function () {
-        return Formio.pluginGet('request', requestArgs).then(function (result) {
-          if (isNil(result)) {
-            return Formio.request(url, method, requestArgs.data, requestArgs.opts.header, requestArgs.opts);
-          }
-          return result;
-        });
-      });
-
-      return Formio.pluginAlter('wrapRequestPromise', request, requestArgs);
-    }
-  }, {
-    key: 'request',
-    value: function request(url, method, data, header, opts) {
-      if (!url) {
-        return _nativePromiseOnly2.default.reject('No url provided');
-      }
-      method = (method || 'GET').toUpperCase();
-
-      // For reverse compatibility, if they provided the ignoreCache parameter,
-      // then change it back to the options format where that is a parameter.
-      if (isBoolean(opts)) {
-        opts = { ignoreCache: opts };
-      }
-      if (!opts || !isObject(opts)) {
-        opts = {};
-      }
-
-      // Generate a cachekey.
-      var cacheKey = btoa(url);
-
-      // Get the cached promise to save multiple loads.
-      if (!opts.ignoreCache && method === 'GET' && Formio.cache.hasOwnProperty(cacheKey)) {
-        return _nativePromiseOnly2.default.resolve(Formio.cache[cacheKey]);
-      }
-
-      // Set up and fetch request
-      var headers = header || new Headers(opts.headers || {
-        'Accept': 'application/json',
-        'Content-type': 'application/json; charset=UTF-8'
-      });
-      var token = Formio.getToken();
-      if (token && !opts.noToken) {
-        headers.append('x-jwt-token', token);
-      }
-
-      var options = {
-        method: method,
-        headers: headers,
-        mode: 'cors'
-      };
-      if (data) {
-        options.body = JSON.stringify(data);
-      }
-
-      // Allow plugins to alter the options.
-      options = Formio.pluginAlter('requestOptions', options, url);
-
-      var requestToken = options.headers.get('x-jwt-token');
-      return fetch(url, options).then(function (response) {
-        // Allow plugins to respond.
-        response = Formio.pluginAlter('requestResponse', response, Formio);
-
-        if (!response.ok) {
-          if (response.status === 440) {
-            Formio.setToken(null);
-            Formio.events.emit('formio.sessionExpired', response.body);
-          } else if (response.status === 401) {
-            Formio.events.emit('formio.unauthorized', response.body);
-          }
-          // Parse and return the error as a rejected promise to reject this promise
-          return (response.headers.get('content-type').indexOf('application/json') !== -1 ? response.json() : response.text()).then(function (error) {
-            return _nativePromiseOnly2.default.reject(error);
-          });
-        }
-
-        // Handle fetch results
-        var token = response.headers.get('x-jwt-token');
-
-        // In some strange cases, the fetch library will return an x-jwt-token without sending
-        // one to the server. This has even been debugged on the server to verify that no token
-        // was introduced with the request, but the response contains a token. This is an Invalid
-        // case where we do not send an x-jwt-token and get one in return for any GET request.
-        var tokenIntroduced = false;
-        if (method === 'GET' && !requestToken && token && !(url.indexOf('token=') !== -1) && !(url.indexOf('x-jwt-token=') !== -1)) {
-          console.warn('Token was introduced in request.');
-          tokenIntroduced = true;
-        }
-
-        if (response.status >= 200 && response.status < 300 && token && token !== '' && !tokenIntroduced) {
-          Formio.setToken(token);
-        }
-        // 204 is no content. Don't try to .json() it.
-        if (response.status === 204) {
-          return {};
-        }
-
-        var getResult = response.headers.get('content-type').indexOf('application/json') !== -1 ? response.json() : response.text();
-        return getResult.then(function (result) {
-          // Add some content-range metadata to the result here
-          var range = response.headers.get('content-range');
-          if (range && isObject(result)) {
-            range = range.split('/');
-            if (range[0] !== '*') {
-              var skipLimit = range[0].split('-');
-              result.skip = Number(skipLimit[0]);
-              result.limit = skipLimit[1] - skipLimit[0] + 1;
-            }
-            result.serverCount = range[1] === '*' ? range[1] : Number(range[1]);
-          }
-
-          if (!opts.getHeaders) {
-            return result;
-          }
-
-          var headers = {};
-          response.headers.forEach(function (item, key) {
-            headers[key] = item;
-          });
-
-          // Return the result with the headers.
-          return {
-            result: result,
-            headers: headers
-          };
-        });
-      }).then(function (result) {
-        if (opts.getHeaders) {
-          return result;
-        }
-
-        var resultCopy = {};
-
-        // Shallow copy result so modifications don't end up in cache
-        if (Array.isArray(result)) {
-          resultCopy = result.map(_shallowCopy2.default);
-          resultCopy.skip = result.skip;
-          resultCopy.limit = result.limit;
-          resultCopy.serverCount = result.serverCount;
-        } else {
-          resultCopy = (0, _shallowCopy2.default)(result);
-        }
-
-        // Cache the response.
-        if (method === 'GET') {
-          Formio.cache[cacheKey] = resultCopy;
-        }
-
-        return resultCopy;
-      }).catch(function (err) {
-        if (err === 'Bad Token') {
-          Formio.setToken(null);
-          Formio.events.emit('formio.badToken', err);
-        }
-        if (err.message) {
-          err.message = 'Could not connect to API server (' + err.message + ')';
-          err.networkError = true;
-        }
-        return _nativePromiseOnly2.default.reject(err);
-      });
-    }
-  }, {
-    key: 'setToken',
-    value: function setToken(token) {
-      token = token || '';
-      if (token === this.token) {
-        return;
-      }
-      this.token = token;
-      if (!token) {
-        Formio.setUser(null);
-        // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
-        try {
-          return localStorage.removeItem('formioToken');
-        } catch (err) {
-          return _browserCookies2.default.erase('formioToken', { path: '/' });
-        }
-      }
-      // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
-      try {
-        localStorage.setItem('formioToken', token);
-      } catch (err) {
-        _browserCookies2.default.set('formioToken', token, { path: '/' });
-      }
-      return Formio.currentUser(); // Run this so user is updated if null
-    }
-  }, {
-    key: 'getToken',
-    value: function getToken() {
-      if (this.token) {
-        return this.token;
-      }
-      try {
-        this.token = localStorage.getItem('formioToken') || '';
-        return this.token;
-      } catch (e) {
-        this.token = _browserCookies2.default.get('formioToken');
-        return this.token;
-      }
-    }
-  }, {
-    key: 'setUser',
-    value: function setUser(user) {
-      if (!user) {
-        this.setToken(null);
-        // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
-        try {
-          return localStorage.removeItem('formioUser');
-        } catch (err) {
-          return _browserCookies2.default.erase('formioUser', { path: '/' });
-        }
-      }
-      // iOS in private browse mode will throw an error but we can't detect ahead of time that we are in private mode.
-      try {
-        localStorage.setItem('formioUser', JSON.stringify(user));
-      } catch (err) {
-        _browserCookies2.default.set('formioUser', JSON.stringify(user), { path: '/' });
-      }
-    }
-  }, {
-    key: 'getUser',
-    value: function getUser() {
-      try {
-        return JSON.parse(localStorage.getItem('formioUser') || null);
-      } catch (e) {
-        return JSON.parse(_browserCookies2.default.get('formioUser'));
-      }
-    }
-  }, {
-    key: 'setBaseUrl',
-    value: function setBaseUrl(url) {
-      Formio.baseUrl = url;
-      if (!Formio.projectUrlSet) {
-        Formio.projectUrl = url;
-      }
-    }
-  }, {
-    key: 'getBaseUrl',
-    value: function getBaseUrl() {
-      return Formio.baseUrl;
-    }
-  }, {
-    key: 'setApiUrl',
-    value: function setApiUrl(url) {
-      return Formio.setBaseUrl(url);
-    }
-  }, {
-    key: 'getApiUrl',
-    value: function getApiUrl() {
-      return Formio.getBaseUrl();
-    }
-  }, {
-    key: 'setAppUrl',
-    value: function setAppUrl(url) {
-      console.warn('Formio.setAppUrl() is deprecated. Use Formio.setProjectUrl instead.');
-      Formio.projectUrl = url;
-      Formio.projectUrlSet = true;
-    }
-  }, {
-    key: 'setProjectUrl',
-    value: function setProjectUrl(url) {
-      Formio.projectUrl = url;
-      Formio.projectUrlSet = true;
-    }
-  }, {
-    key: 'getAppUrl',
-    value: function getAppUrl() {
-      console.warn('Formio.getAppUrl() is deprecated. Use Formio.getProjectUrl instead.');
-      return Formio.projectUrl;
-    }
-  }, {
-    key: 'getProjectUrl',
-    value: function getProjectUrl() {
-      return Formio.projectUrl;
-    }
-  }, {
-    key: 'clearCache',
-    value: function clearCache() {
-      Formio.cache = {};
-    }
-  }, {
-    key: 'noop',
-    value: function noop() {}
-  }, {
-    key: 'identity',
-    value: function identity(value) {
-      return value;
-    }
-  }, {
-    key: 'deregisterPlugin',
-    value: function deregisterPlugin(plugin) {
-      var beforeLength = Formio.plugins.length;
-      Formio.plugins = Formio.plugins.filter(function (p) {
-        if (p !== plugin && p.__name !== plugin) {
-          return true;
-        }
-
-        (p.deregister || Formio.noop).call(plugin, Formio);
-        return false;
-      });
-      return beforeLength !== Formio.plugins.length;
-    }
-  }, {
-    key: 'registerPlugin',
-    value: function registerPlugin(plugin, name) {
-      Formio.plugins.push(plugin);
-      Formio.plugins.sort(function (a, b) {
-        return (b.priority || 0) - (a.priority || 0);
-      });
-      plugin.__name = name;
-      (plugin.init || Formio.noop).call(plugin, Formio);
-    }
-  }, {
-    key: 'getPlugin',
-    value: function getPlugin(name) {
-      var _iteratorNormalCompletion = true;
-      var _didIteratorError = false;
-      var _iteratorError = undefined;
-
-      try {
-        for (var _iterator = Formio.plugins[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-          var plugin = _step.value;
-
-          if (plugin.__name === name) {
-            return plugin;
-          }
-        }
-      } catch (err) {
-        _didIteratorError = true;
-        _iteratorError = err;
-      } finally {
-        try {
-          if (!_iteratorNormalCompletion && _iterator.return) {
-            _iterator.return();
-          }
-        } finally {
-          if (_didIteratorError) {
-            throw _iteratorError;
-          }
-        }
-      }
-
-      return null;
-    }
-  }, {
-    key: 'pluginWait',
-    value: function pluginWait(pluginFn) {
-      for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
-        args[_key2 - 1] = arguments[_key2];
-      }
-
-      return _nativePromiseOnly2.default.all(Formio.plugins.map(function (plugin) {
-        var _ref;
-
-        return (_ref = plugin[pluginFn] || Formio.noop).call.apply(_ref, [plugin].concat(args));
-      }));
-    }
-  }, {
-    key: 'pluginGet',
-    value: function pluginGet(pluginFn) {
-      for (var _len3 = arguments.length, args = Array(_len3 > 1 ? _len3 - 1 : 0), _key3 = 1; _key3 < _len3; _key3++) {
-        args[_key3 - 1] = arguments[_key3];
-      }
-
-      var callPlugin = function callPlugin(index) {
-        var _ref2;
-
-        var plugin = Formio.plugins[index];
-
-        if (!plugin) {
-          return _nativePromiseOnly2.default.resolve(null);
-        }
-
-        return _nativePromiseOnly2.default.resolve((_ref2 = plugin[pluginFn] || Formio.noop).call.apply(_ref2, [plugin].concat(args))).then(function (result) {
-          if (!isNil(result)) {
-            return result;
-          }
-
-          return callPlugin(index + 1);
-        });
-      };
-      return callPlugin(0);
-    }
-  }, {
-    key: 'pluginAlter',
-    value: function pluginAlter(pluginFn, value) {
-      for (var _len4 = arguments.length, args = Array(_len4 > 2 ? _len4 - 2 : 0), _key4 = 2; _key4 < _len4; _key4++) {
-        args[_key4 - 2] = arguments[_key4];
-      }
-
-      return Formio.plugins.reduce(function (value, plugin) {
-        return (plugin[pluginFn] || Formio.identity).apply(undefined, [value].concat(args));
-      }, value);
-    }
-  }, {
-    key: 'accessInfo',
-    value: function accessInfo(formio) {
-      var projectUrl = formio ? formio.projectUrl : Formio.projectUrl;
-      return Formio.makeRequest(formio, 'accessInfo', projectUrl + '/access');
-    }
-  }, {
-    key: 'currentUser',
-    value: function currentUser(formio, options) {
-      var projectUrl = formio ? formio.projectUrl : Formio.baseUrl;
-      projectUrl += '/current';
-      var user = this.getUser();
-      if (user) {
-        return Formio.pluginAlter('wrapStaticRequestPromise', _nativePromiseOnly2.default.resolve(user), {
-          url: projectUrl,
-          method: 'GET',
-          options: options
-        });
-      }
-      var token = Formio.getToken();
-      if (!token) {
-        return Formio.pluginAlter('wrapStaticRequestPromise', _nativePromiseOnly2.default.resolve(null), {
-          url: projectUrl,
-          method: 'GET',
-          options: options
-        });
-      }
-      return Formio.makeRequest(formio, 'currentUser', projectUrl, 'GET', null, options).then(function (response) {
-        Formio.setUser(response);
-        return response;
-      });
-    }
-  }, {
-    key: 'logout',
-    value: function logout(formio) {
-      Formio.setToken(null);
-      Formio.setUser(null);
-      Formio.clearCache();
-      var projectUrl = formio ? formio.projectUrl : Formio.baseUrl;
-      return Formio.makeRequest(formio, 'logout', projectUrl + '/logout');
-    }
-  }]);
-
-  return Formio;
-}();
-
-// Define all the static properties.
-
-
-exports.default = Formio;
-Formio.Headers = Headers;
-Formio.baseUrl = 'https://api.form.io';
-Formio.projectUrl = Formio.baseUrl;
-Formio.projectUrlSet = false;
-Formio.plugins = [];
-Formio.cache = {};
-Formio.providers = _providers2.default;
-Formio.events = new _eventemitter.EventEmitter2({
-  wildcard: false,
-  maxListeners: 0
-});
-
-if ((typeof global === 'undefined' ? 'undefined' : _typeof(global)) === 'object' && !global.Formio) {
-  global.Formio = Formio;
-}
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./providers":270,"browser-cookies":25,"eventemitter2":26,"native-promise-only":264,"shallow-copy":350,"whatwg-fetch":356}],270:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _storage = _dereq_('./storage');
-
-var _storage2 = _interopRequireDefault(_storage);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-exports.default = {
-  storage: _storage2.default
-};
-},{"./storage":273}],271:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _nativePromiseOnly = _dereq_('native-promise-only');
-
-var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var base64 = function base64() {
-  return {
-    title: 'Base64',
-    name: 'base64',
-    uploadFile: function uploadFile(file, fileName) {
-      var _this = this;
-
-      var reader = new FileReader();
-
-      return new _nativePromiseOnly2.default(function (resolve, reject) {
-        reader.onload = function (event) {
-          var url = event.target.result;
-          resolve({
-            storage: 'base64',
-            name: fileName,
-            url: url,
-            size: file.size,
-            type: file.type,
-            data: url.replace('data:' + file.type + ';base64,', '')
-          });
-        };
-
-        reader.onerror = function () {
-          return reject(_this);
-        };
-
-        reader.readAsDataURL(file);
-      });
-    },
-    downloadFile: function downloadFile(file) {
-      // Return the original as there is nothing to do.
-      return _nativePromiseOnly2.default.resolve(file);
-    }
-  };
-};
-
-base64.title = 'Base64';
-exports.default = base64;
-},{"native-promise-only":264}],272:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _nativePromiseOnly = _dereq_('native-promise-only');
-
-var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var dropbox = function dropbox(formio) {
-  return {
-    uploadFile: function uploadFile(file, fileName, dir, progressCallback) {
-      return new _nativePromiseOnly2.default(function (resolve, reject) {
-        // Send the file with data.
-        var xhr = new XMLHttpRequest();
-
-        if (typeof progressCallback === 'function') {
-          xhr.upload.onprogress = progressCallback;
-        }
-
-        var fd = new FormData();
-        fd.append('name', fileName);
-        fd.append('dir', dir);
-        fd.append('file', file);
-
-        // Fire on network error.
-        xhr.onerror = function (err) {
-          err.networkError = true;
-          reject(err);
-        };
-
-        xhr.onload = function () {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            var response = JSON.parse(xhr.response);
-            response.storage = 'dropbox';
-            response.size = file.size;
-            response.type = file.type;
-            response.url = response.path_lower;
-            resolve(response);
-          } else {
-            reject(xhr.response || 'Unable to upload file');
-          }
-        };
-
-        xhr.onabort = function (err) {
-          reject(err);
-        };
-
-        xhr.open('POST', formio.formUrl + '/storage/dropbox');
-        var token = formio.getToken();
-        if (token) {
-          xhr.setRequestHeader('x-jwt-token', token);
-        }
-        xhr.send(fd);
-      });
-    },
-    downloadFile: function downloadFile(file) {
-      var token = formio.getToken();
-      file.url = formio.formUrl + '/storage/dropbox?path_lower=' + file.path_lower + (token ? '&x-jwt-token=' + token : '');
-      return _nativePromiseOnly2.default.resolve(file);
-    }
-  };
-};
-
-dropbox.title = 'Dropbox';
-exports.default = dropbox;
-},{"native-promise-only":264}],273:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _base = _dereq_('./base64');
-
-var _base2 = _interopRequireDefault(_base);
-
-var _dropbox = _dereq_('./dropbox');
-
-var _dropbox2 = _interopRequireDefault(_dropbox);
-
-var _s = _dereq_('./s3');
-
-var _s2 = _interopRequireDefault(_s);
-
-var _url = _dereq_('./url');
-
-var _url2 = _interopRequireDefault(_url);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-exports.default = {
-  base64: _base2.default,
-  dropbox: _dropbox2.default,
-  s3: _s2.default,
-  url: _url2.default
-};
-},{"./base64":271,"./dropbox":272,"./s3":274,"./url":275}],274:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _nativePromiseOnly = _dereq_('native-promise-only');
-
-var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var s3 = function s3(formio) {
-  return {
-    uploadFile: function uploadFile(file, fileName, dir, progressCallback) {
-      return new _nativePromiseOnly2.default(function (resolve, reject) {
-        // Send the pre response to sign the upload.
-        var pre = new XMLHttpRequest();
-
-        var prefd = new FormData();
-        prefd.append('name', fileName);
-        prefd.append('size', file.size);
-        prefd.append('type', file.type);
-
-        // This only fires on a network error.
-        pre.onerror = function (err) {
-          err.networkError = true;
-          reject(err);
-        };
-
-        pre.onabort = function (err) {
-          reject(err);
-        };
-
-        pre.onload = function () {
-          if (pre.status >= 200 && pre.status < 300) {
-            var response = JSON.parse(pre.response);
-
-            // Send the file with data.
-            var xhr = new XMLHttpRequest();
-
-            if (typeof progressCallback === 'function') {
-              xhr.upload.onprogress = progressCallback;
-            }
-
-            response.data.fileName = fileName;
-            response.data.key += dir + fileName;
-
-            var fd = new FormData();
-            for (var key in response.data) {
-              fd.append(key, response.data[key]);
-            }
-            fd.append('file', file);
-
-            // Fire on network error.
-            xhr.onerror = function (err) {
-              err.networkError = true;
-              reject(err);
-            };
-
-            xhr.onload = function () {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                resolve({
-                  storage: 's3',
-                  name: fileName,
-                  bucket: response.bucket,
-                  key: response.data.key,
-                  url: response.url + response.data.key,
-                  acl: response.data.acl,
-                  size: file.size,
-                  type: file.type
-                });
-              } else {
-                reject(xhr.response || 'Unable to upload file');
-              }
-            };
-
-            xhr.onabort = function (err) {
-              reject(err);
-            };
-
-            xhr.open('POST', response.url);
-
-            xhr.send(fd);
-          } else {
-            reject(pre.response || 'Unable to sign file');
-          }
-        };
-
-        pre.open('POST', formio.formUrl + '/storage/s3');
-
-        pre.setRequestHeader('Accept', 'application/json');
-        pre.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-        var token = formio.getToken();
-        if (token) {
-          pre.setRequestHeader('x-jwt-token', token);
-        }
-
-        pre.send(JSON.stringify({
-          name: fileName,
-          size: file.size,
-          type: file.type
-        }));
-      });
-    },
-    downloadFile: function downloadFile(file) {
-      if (file.acl !== 'public-read') {
-        return formio.makeRequest('file', formio.formUrl + '/storage/s3?bucket=' + file.bucket + '&key=' + file.key, 'GET');
-      } else {
-        return _nativePromiseOnly2.default.resolve(file);
-      }
-    }
-  };
-};
-
-s3.title = 'S3';
-exports.default = s3;
-},{"native-promise-only":264}],275:[function(_dereq_,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _nativePromiseOnly = _dereq_('native-promise-only');
-
-var _nativePromiseOnly2 = _interopRequireDefault(_nativePromiseOnly);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var url = function url(formio) {
-  return {
-    title: 'Url',
-    name: 'url',
-    uploadFile: function uploadFile(file, fileName, dir, progressCallback, url) {
-      return new _nativePromiseOnly2.default(function (resolve, reject) {
-        var data = {
-          dir: dir,
-          name: fileName,
-          file: file
-        };
-
-        // Send the file with data.
-        var xhr = new XMLHttpRequest();
-
-        if (typeof progressCallback === 'function') {
-          xhr.upload.onprogress = progressCallback;
-        }
-
-        var fd = new FormData();
-        for (var key in data) {
-          fd.append(key, data[key]);
-        }
-
-        xhr.onload = function () {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            // Need to test if xhr.response is decoded or not.
-            var respData = {};
-            try {
-              respData = typeof xhr.response === 'string' ? JSON.parse(xhr.response) : {};
-              respData = respData && respData.data ? respData.data : respData;
-            } catch (err) {
-              respData = {};
-            }
-
-            resolve({
-              storage: 'url',
-              name: fileName,
-              url: xhr.responseURL + '/' + fileName,
-              size: file.size,
-              type: file.type,
-              data: respData
-            });
-          } else {
-            reject(xhr.response || 'Unable to upload file');
-          }
-        };
-
-        // Fire on network error.
-        xhr.onerror = function () {
-          reject(xhr);
-        };
-
-        xhr.onabort = function () {
-          reject(xhr);
-        };
-
-        xhr.open('POST', url);
-        var token = formio.getToken();
-        if (token) {
-          xhr.setRequestHeader('x-jwt-token', token);
-        }
-        xhr.send(fd);
-      });
-    },
-    downloadFile: function downloadFile(file) {
-      // Return the original as there is nothing to do.
-      return _nativePromiseOnly2.default.resolve(file);
-    }
-  };
-};
-
-url.title = 'Url';
-exports.default = url;
-},{"native-promise-only":264}],276:[function(_dereq_,module,exports){
-arguments[4][27][0].apply(exports,arguments)
-},{"./utils":278,"dup":27}],277:[function(_dereq_,module,exports){
-arguments[4][28][0].apply(exports,arguments)
-},{"dup":28}],278:[function(_dereq_,module,exports){
-arguments[4][29][0].apply(exports,arguments)
-},{"./jsonlogic/operators":277,"dup":29,"json-logic-js":31,"lodash":242,"moment":263}],279:[function(_dereq_,module,exports){
+},{"./dist/ng-file-upload-all":274}],276:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -96733,7 +97273,7 @@ module.exports = function(app) {
     '$templateCache',
     function($templateCache) {
       $templateCache.put('formio/components/address.html',
-        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\"\n       id=\"{{componentId+'Label'}}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<ui-select auto-focus=\"true\" ng-model=\"data[component.key]\" safe-multiple-to-single ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" tabindex=\"{{ component.tabindex || 0 }}\"  aria-labelledby=\"{{ componentId +'Label'}}\"\n           aria-describedby=\"{{componentId + 'Desc'}}\" theme=\"bootstrap\" ng-style=\"getInputGroupStyles(component)\">\n  <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">{{$item.formatted_address || $select.selected.formatted_address}}</ui-select-match>\n  <ui-select-choices class=\"ui-select-choices\" repeat=\"address in addresses\" refresh=\"refreshAddress($select.search)\" refresh-delay=\"500\">\n    <div ng-bind-html=\"address.formatted_address | highlight: $select.search\"></div>\n  </ui-select-choices>\n</ui-select>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" class=\"control-label--bottom\" id=\"{{componentId+'Desc'}}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<formio-errors ng-if=\"::!options.building\"></formio-errors>\n"
+        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\"\n       id=\"{{componentId+'Label'}}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<ui-select auto-focus=\"true\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" safe-multiple-to-single ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" tabindex=\"{{ component.tabindex || 0 }}\"  aria-labelledby=\"{{ componentId +'Label'}}\"\n           aria-describedby=\"{{componentId + 'Desc'}}\" theme=\"bootstrap\" ng-style=\"getInputGroupStyles(component)\">\n  <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">{{$item.formatted_address || $select.selected.formatted_address}}</ui-select-match>\n  <ui-select-choices class=\"ui-select-choices\" repeat=\"address in addresses\" refresh=\"refreshAddress($select.search)\" refresh-delay=\"500\">\n    <div ng-bind-html=\"address.formatted_address | highlight: $select.search\"></div>\n  </ui-select-choices>\n</ui-select>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" class=\"control-label--bottom\" id=\"{{componentId+'Desc'}}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<formio-errors ng-if=\"::!options.building\"></formio-errors>\n"
       );
 
       // Change the ui-select to ui-select multiple.
@@ -96744,7 +97284,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],280:[function(_dereq_,module,exports){
+},{}],277:[function(_dereq_,module,exports){
 "use strict";
 
 var _merge = _dereq_('lodash/merge');
@@ -96985,7 +97525,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/merge":246}],281:[function(_dereq_,module,exports){
+},{"lodash/merge":254}],278:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -97063,13 +97603,13 @@ module.exports = function(app) {
     '$templateCache',
     function($templateCache) {
       $templateCache.put('formio/components/checkbox.html',
-        "<div class=\"checkbox\">\n  <label for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" id=\"{{ componentId+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n    <span ng-if=\"labelVisible() && topOrLeftOptionLabel(component)\">\n      {{ component.label | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </span>\n    <input\n      ng-if=\"component.name\"\n      type=\"{{ component.inputType }}\"\n      id=\"{{ componentId }}\"\n      name=\"{{ component.name }}\"\n      value=\"{{ component.value }}\"\n      tabindex=\"{{ component.tabindex || 0 }}\"\n      aria-labelledby=\"{{ componentId +'Label'}}\"\n      aria-describedby=\"{{componentId + 'Desc'}}\"\n      ng-disabled=\"readOnly\"\n      auto-focus=\"true\"\n      ng-model=\"data[component.name]\"\n      ng-required=\"component.validate.required\"\n      ng-style=\"getOptionInputStyles(component)\"\n    >\n    <input\n      ng-if=\"!component.name\"\n      type=\"{{ component.inputType }}\"\n      id=\"{{ componentId }}\"\n      name=\"{{ componentId }}\"\n      tabindex=\"{{ component.tabindex || 0 }}\"\n      ng-disabled=\"readOnly\"\n      auto-focus=\"true\"\n      ng-model=\"data[component.key]\"\n      aria-labelledby=\"{{ componentId +'Label'}}\"\n      aria-describedby=\"{{componentId + 'Desc'}}\"\n      ng-required=\"isRequired(component)\"\n      custom-validator=\"component.validate.custom\"\n      ng-style=\"getOptionInputStyles(component)\"\n    >\n    <span ng-if=\"labelVisible() && !topOrLeftOptionLabel(component)\">\n      {{ component.label | formioTranslate:null:options.building | shortcut:component.shortcut }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </span>\n  </label>\n</div>\n<div ng-if=\"!!component.description\" class=\"help-block\">\n  <span id=\"{{ componentId+'Desc' }}\">{{ component.description }}</span>\n</div>\n"
+        "<div class=\"checkbox\">\n  <label for=\"{{ componentId }}\" ng-class=\"{'field-required': isRequired(component)}\" id=\"{{ componentId+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n    <span ng-if=\"labelVisible() && topOrLeftOptionLabel(component)\">\n      {{ component.label | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </span>\n    <input\n      ng-if=\"component.name\"\n      type=\"{{ component.inputType }}\"\n      id=\"{{ componentId }}\"\n      name=\"{{ component.name }}\"\n      value=\"{{ component.value }}\"\n      tabindex=\"{{ component.tabindex || 0 }}\"\n      aria-labelledby=\"{{ componentId +'Label'}}\"\n      aria-describedby=\"{{componentId + 'Desc'}}\"\n      ng-disabled=\"readOnly\"\n      auto-focus=\"true\"\n      ng-model=\"data[component.name]\"\n      ng-model-options=\"{allowInvalid: true}\"\n      ng-required=\"component.validate.required\"\n      ng-style=\"getOptionInputStyles(component)\"\n    >\n    <input\n      ng-if=\"!component.name\"\n      type=\"{{ component.inputType }}\"\n      id=\"{{ componentId }}\"\n      name=\"{{ componentId }}\"\n      tabindex=\"{{ component.tabindex || 0 }}\"\n      ng-disabled=\"readOnly\"\n      auto-focus=\"true\"\n      ng-model=\"data[component.key]\"\n      ng-model-options=\"{allowInvalid: true}\"\n      aria-labelledby=\"{{ componentId +'Label'}}\"\n      aria-describedby=\"{{componentId + 'Desc'}}\"\n      ng-required=\"isRequired(component)\"\n      custom-validator=\"component.validate.custom\"\n      ng-style=\"getOptionInputStyles(component)\"\n    >\n    <span ng-if=\"labelVisible() && !topOrLeftOptionLabel(component)\">\n      {{ component.label | formioTranslate:null:options.building | shortcut:component.shortcut }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </span>\n  </label>\n</div>\n<div ng-if=\"!!component.description\" class=\"help-block\">\n  <span id=\"{{ componentId+'Desc' }}\">{{ component.description }}</span>\n</div>\n"
       );
     }
   ]);
 };
 
-},{}],282:[function(_dereq_,module,exports){
+},{}],279:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -97163,7 +97703,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],283:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],280:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.provider('formioComponents', function() {
@@ -97235,7 +97775,7 @@ module.exports = function(app) {
   }]);
 };
 
-},{}],284:[function(_dereq_,module,exports){
+},{}],281:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -97307,7 +97847,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],285:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],282:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -97336,7 +97876,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],286:[function(_dereq_,module,exports){
+},{}],283:[function(_dereq_,module,exports){
 "use strict";
 
 var createNumberMask = _dereq_('text-mask-addons').createNumberMask;
@@ -97418,13 +97958,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/currency.html', FormioUtils.fieldWrap(
-        "<input\n  type=\"text\"\n  inputmode=\"numeric\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-model=\"data[component.key]\"\n  ng-required=\"isRequired(component)\"\n  ng-disabled=\"readOnly\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-attr-placeholder=\"{{ component.placeholder }}\"\n  custom-validator=\"component.validate.custom\"\n  formio-mask=\"currency\"\n>\n"
+        "<input\n  type=\"text\"\n  inputmode=\"numeric\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  ng-required=\"isRequired(component)\"\n  ng-disabled=\"readOnly\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-attr-placeholder=\"{{ component.placeholder }}\"\n  custom-validator=\"component.validate.custom\"\n  formio-mask=\"currency\"\n>\n"
       ));
     }
   ]);
 };
 
-},{"lodash/get":216,"lodash/isNil":232,"text-mask-addons":352}],287:[function(_dereq_,module,exports){
+},{"lodash/get":224,"lodash/isNil":240,"text-mask-addons":349}],284:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -97452,7 +97992,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],288:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],285:[function(_dereq_,module,exports){
 "use strict";
 
 var formioUtils = _dereq_('formiojs/utils').default;
@@ -97527,35 +98067,6 @@ module.exports = function(app) {
       });
     }
   ]);
-  app.directive('datagridValidation', function() {
-    return {
-      require: 'ngModel',
-      restrict: 'A',
-      link: function(scope, elem, attr, ctrl) {
-        if ((scope.options && scope.options.building) || !scope.formioForm || !scope.component.validate || !scope.component.validate.custom) return;
-
-        // Add the control to the main form.
-        ctrl.$name = scope.componentId;
-        scope.formioForm.$addControl(ctrl);
-        // For some reason the validator deletes the ng-model value if validation fails so make a fake copy since we don't need it anyway.
-        scope.dataValue = angular.copy(scope.data);
-
-        var init = true;
-
-        // Wait 300ms for changes to trigger the datagrid.
-        setTimeout(function() {
-          init = false;
-        }, 300);
-        scope.$watch('data', function() {
-          scope.dataValue = angular.copy(scope.data);
-          ctrl.$validate();
-          if (!init) {
-            ctrl.$setDirty(true);
-          }
-        }, true);
-      }
-    }
-  });
   app.controller('formioDataGrid', [
     '$scope',
     'FormioUtils',
@@ -97563,11 +98074,11 @@ module.exports = function(app) {
       if ($scope.options && $scope.options.building) return;
       // Ensure each data grid has a valid data model.
       $scope.data = $scope.data || {};
-      $scope.data[$scope.component.key] = $scope.data[$scope.component.key] || [{}];
+      $scope.data[$scope.componentId] = $scope.data[$scope.componentId] || [{}];
 
       // Determine if any component is visible.
       $scope.anyVisible = function(component) {
-        var data = $scope.data[$scope.component.key];
+        var data = $scope.data[$scope.componentId];
         var visible = false;
         angular.forEach(data, function(rowData) {
           visible = (visible || FormioUtils.isVisible(component, rowData, $scope.data, $scope.hideComponents));
@@ -97576,7 +98087,7 @@ module.exports = function(app) {
       };
 
       // Pull out the rows and cols for easy iteration.
-      $scope.rows = $scope.data[$scope.component.key];
+      $scope.rows = $scope.data[$scope.componentId];
       // If less than minLength, add that many rows.
       if ($scope.component.validate && $scope.component.validate.hasOwnProperty('minLength') && $scope.rows.length < $scope.component.validate.minLength) {
         var toAdd = $scope.component.validate.minLength - $scope.rows.length;
@@ -97612,13 +98123,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/datagrid.html', FormioUtils.fieldWrap(
-        "<div name=\"{{ componentId }}\" class=\"formio-data-grid\" ng-model=\"dataValue[componentId]\" custom-validator=\"component.validate.custom\" datagrid-validation ng-controller=\"formioDataGrid\">\n  <table ng-class=\"{'table-striped': component.striped, 'table-bordered': component.bordered, 'table-hover': component.hover, 'table-condensed': component.condensed}\" class=\"table datagrid-table\">\n    <thead>\n      <tr>\n        <th\n          ng-repeat=\"col in cols track by $index\"\n          ng-class=\"{'field-required': col.validate.required}\"\n          ng-if=\"options.building ? '::true' : anyVisible(col)\"\n        ><span ng-if=\"!col.dataGridLabel && (col.input || !col.hideLabel)\">{{ col.label | formioTranslate:null:options.building }}</span></th>\n        <th style=\"padding-left: 9px;\">\n          <div style=\"padding: 0; margin-bottom: 0;\" class=\"datagrid-add\" ng-if=\"(!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || rows.length < component.validate.maxLength) && (component.addAnotherPosition === 'top' || component.addAnotherPosition === 'both')\">\n            <a ng-click=\"(readOnly || formioForm.submitting)? null: addRow() \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-primary\">\n              <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ \"\" | formioTranslate:null:options.building }}\n            </a>\n          </div>\n        </th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr ng-repeat=\"row in rows track by $index\" ng-init=\"rowIndex = $index\">\n        <td ng-repeat=\"col in cols track by $index\" ng-init=\"col.inDataGrid = true; colIndex = $index\" class=\"formio-data-grid-row\" ng-if=\"options.building ? '::true' : anyVisible(col)\">\n          <formio-component\n            component=\"col\"\n            data=\"rows[rowIndex]\"\n            form-name=\"formName\"\n            formio=\"formio\"\n            submission=\"submission\"\n            hide-components=\"hideComponents\"\n            ng-if=\"options.building ? '::true' : isVisible(col, row)\"\n            read-only=\"isDisabled(col, row)\"\n            grid-row=\"rowIndex\"\n            grid-col=\"colIndex\"\n            options=\"options\"\n          ></formio-component>\n        </td>\n        <td ng-if=\"!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('minLength') || rows.length > component.validate.minLength\">\n          <a ng-click=\"(readOnly || formioForm.submitting)? null: removeRow(rowIndex) \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-default\">\n            <span class=\"glyphicon glyphicon-remove-circle\"></span>\n          </a>\n        </td>\n      </tr>\n    </tbody>\n  </table>\n  <div style=\"margin-top: 10px\" class=\"datagrid-add\" ng-if=\"(!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || !component.validate.maxLength || rows.length < component.validate.maxLength) && (!component.addAnotherPosition || component.addAnotherPosition === 'bottom' || component.addAnotherPosition === 'both')\">\n    <a ng-click=\"(readOnly || formioForm.submitting)? null: addRow() \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-primary\">\n      <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addAnother || \"Add Another\" | formioTranslate:null:options.building }}\n    </a>\n  </div>\n</div>\n\n\n"
+        "<div name=\"{{ componentId }}\" class=\"formio-data-grid\" ng-model=\"data[componentId]\" ng-model-options=\"{allowInvalid: true}\" custom-validator=\"component.validate.custom\" ng-controller=\"formioDataGrid\">\n  <table ng-class=\"{'table-striped': component.striped, 'table-bordered': component.bordered, 'table-hover': component.hover, 'table-condensed': component.condensed}\" class=\"table datagrid-table\">\n    <thead>\n      <tr>\n        <th\n          ng-repeat=\"col in cols track by $index\"\n          ng-class=\"{'field-required': col.validate.required}\"\n          ng-if=\"options.building ? '::true' : anyVisible(col)\"\n        ><span ng-if=\"!col.dataGridLabel && (col.input || !col.hideLabel)\">{{ col.label | formioTranslate:null:options.building }}</span></th>\n        <th style=\"padding-left: 9px;\">\n          <div style=\"padding: 0; margin-bottom: 0;\" class=\"datagrid-add\" ng-if=\"(!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || rows.length < component.validate.maxLength) && (component.addAnotherPosition === 'top' || component.addAnotherPosition === 'both')\">\n            <a ng-click=\"(readOnly || formioForm.submitting)? null: addRow() \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-primary\">\n              <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ \"\" | formioTranslate:null:options.building }}\n            </a>\n          </div>\n        </th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr ng-repeat=\"row in rows track by $index\" ng-init=\"rowIndex = $index\">\n        <td ng-repeat=\"col in cols track by $index\" ng-init=\"col.inDataGrid = true; colIndex = $index\" class=\"formio-data-grid-row\" ng-if=\"options.building ? '::true' : anyVisible(col)\">\n          <formio-component\n            component=\"col\"\n            data=\"rows[rowIndex]\"\n            form-name=\"formName\"\n            formio=\"formio\"\n            submission=\"submission\"\n            hide-components=\"hideComponents\"\n            ng-if=\"options.building ? '::true' : isVisible(col, row)\"\n            read-only=\"isDisabled(col, row)\"\n            grid-row=\"rowIndex\"\n            grid-col=\"colIndex\"\n            options=\"options\"\n          ></formio-component>\n        </td>\n        <td ng-if=\"!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('minLength') || rows.length > component.validate.minLength\">\n          <a ng-click=\"(readOnly || formioForm.submitting)? null: removeRow(rowIndex) \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-default datagrid-remove\">\n            <span class=\"glyphicon glyphicon-remove-circle\"></span>\n          </a>\n        </td>\n      </tr>\n    </tbody>\n  </table>\n  <div style=\"margin-top: 10px\" class=\"datagrid-add\" ng-if=\"(!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || !component.validate.maxLength || rows.length < component.validate.maxLength) && (!component.addAnotherPosition || component.addAnotherPosition === 'bottom' || component.addAnotherPosition === 'both')\">\n    <a ng-click=\"(readOnly || formioForm.submitting)? null: addRow() \" ng-disabled = \"readOnly || formioForm.submitting\" class=\"btn btn-primary\">\n      <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addAnother || \"Add Another\" | formioTranslate:null:options.building }}\n    </a>\n  </div>\n</div>\n\n\n"
       ));
     }
   ]);
 };
 
-},{"formiojs/utils":276}],289:[function(_dereq_,module,exports){
+},{"formiojs/utils":35}],286:[function(_dereq_,module,exports){
 "use strict";
 
 var _get = _dereq_('lodash/get');
@@ -97730,13 +98241,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/datetime.html', FormioUtils.fieldWrap(
-        "<div class=\"input-group\">\n  <input\n    type=\"text\"\n    class=\"form-control\"\n    name=\"{{ componentId }}\"\n    id=\"{{ componentId }}\"\n    ng-focus=\"calendarOpen = autoOpen\"\n    ng-click=\"calendarOpen = true\"\n    ng-init=\"calendarOpen = false\"\n    ng-disabled=\"readOnly\"\n    auto-focus=\"true\"\n    ng-required=\"isRequired(component)\"\n    is-open=\"calendarOpen\"\n    datetime-picker=\"{{ component.format }}\"\n    datepicker-mode=\"component.datepickerMode\"\n    when-closed=\"onClosed()\"\n    aria-labelledby=\"{{ componentId +'Label'}}\"\n    aria-describedby=\"{{componentId + 'Desc'}}\"\n    custom-validator=\"component.validate.custom\"\n    enable-date=\"component.enableDate\"\n    enable-time=\"component.enableTime\"\n    ng-model=\"data[component.key]\"\n    tabindex=\"{{ component.tabindex || 0 }}\"\n    ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n    datepicker-options=\"component.datePicker\"\n    timepicker-options=\"component.timePicker\"\n  />\n  <span class=\"input-group-btn\">\n    <button type=\"button\" ng-disabled=\"readOnly\" class=\"btn btn-default\" ng-click=\"calendarOpen = true\" tabindex=\"-1\" ng-keydown=\"calendarOpen = onKeyDown($event)\">\n      <i ng-if=\"component.enableDate\" class=\"glyphicon glyphicon-calendar\"></i>\n      <i ng-if=\"!component.enableDate\" class=\"glyphicon glyphicon-time\"></i>\n    </button>\n  </span>\n</div>\n"
+        "<div class=\"input-group\">\n  <input\n    type=\"text\"\n    class=\"form-control\"\n    name=\"{{ componentId }}\"\n    id=\"{{ componentId }}\"\n    ng-focus=\"calendarOpen = autoOpen\"\n    ng-click=\"calendarOpen = true\"\n    ng-init=\"calendarOpen = false\"\n    ng-disabled=\"readOnly\"\n    auto-focus=\"true\"\n    ng-required=\"isRequired(component)\"\n    is-open=\"calendarOpen\"\n    datetime-picker=\"{{ component.format }}\"\n    datepicker-mode=\"component.datepickerMode\"\n    when-closed=\"onClosed()\"\n    aria-labelledby=\"{{ componentId +'Label'}}\"\n    aria-describedby=\"{{componentId + 'Desc'}}\"\n    custom-validator=\"component.validate.custom\"\n    enable-date=\"component.enableDate\"\n    enable-time=\"component.enableTime\"\n    ng-model=\"data[component.key]\"\n    ng-model-options=\"{allowInvalid: true}\"\n    tabindex=\"{{ component.tabindex || 0 }}\"\n    ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n    datepicker-options=\"component.datePicker\"\n    timepicker-options=\"component.timePicker\"\n  />\n  <span class=\"input-group-btn\">\n    <button type=\"button\" ng-disabled=\"readOnly\" class=\"btn btn-default\" ng-click=\"calendarOpen = true\" tabindex=\"-1\" ng-keydown=\"calendarOpen = onKeyDown($event)\">\n      <i ng-if=\"component.enableDate\" class=\"glyphicon glyphicon-calendar\"></i>\n      <i ng-if=\"!component.enableDate\" class=\"glyphicon glyphicon-time\"></i>\n    </button>\n  </span>\n</div>\n"
       ));
     }
   ]);
 };
 
-},{"lodash/get":216}],290:[function(_dereq_,module,exports){
+},{"lodash/get":224}],287:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -97979,16 +98490,16 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/day.html', FormioUtils.fieldWrap(
-        "<div class=\"day-input\">\n  <day-input\n    name=\"{{componentId}}\"\n    component-id=\"componentId\"\n    read-only=\"isDisabled(component, data)\"\n    component=\"component\"\n    ng-required=\"isRequired(component)\"\n    custom-validator=\"component.validate.custom\"\n    aria-labelledby=\"{{ componentId +'Label'}}\"\n    aria-describedby=\"{{componentId + 'Desc'}}\"\n    ng-model=\"data[component.key]\"\n    options=\"options\"\n  ></day-input>\n</div>\n"
+        "<div class=\"day-input\">\n  <day-input\n    name=\"{{componentId}}\"\n    component-id=\"componentId\"\n    read-only=\"isDisabled(component, data)\"\n    component=\"component\"\n    ng-required=\"isRequired(component)\"\n    custom-validator=\"component.validate.custom\"\n    aria-labelledby=\"{{ componentId +'Label'}}\"\n    aria-describedby=\"{{componentId + 'Desc'}}\"\n    ng-model=\"data[component.key]\"\n    ng-model-options=\"{allowInvalid: true}\"\n    options=\"options\"\n  ></day-input>\n</div>\n"
       ));
       $templateCache.put('formio/components/day-input.html',
-        "<div class=\"daySelect form row\">\n  <div class=\"form-group col-xs-3\" ng-if=\"component.dayFirst && !component.fields.day.hide\">\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-dayLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n        <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-day\"\n        ng-model=\"date.day\"\n        aria-labelledby=\"{{ componentId }}-dayLabel\"\n        ng-change=\"onChange()\"\n        style=\"padding-right: 10px;\"\n        auto-focus=\"true\"\n        ng-attr-placeholder=\"{{component.fields.day.placeholder}}\"\n        day-part\n        characters=\"2\"\n        min=\"1\"\n        max=\"{{maxDay}}\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-dayLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" class=\"control-label--bottom\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-4\" ng-if=\"!component.fields.month.hide\">\n    <label for=\"{{componentId}}-month\" id=\"{{componentId}}-monthLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\" ng-class=\"{'field-required': component.fields.month.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Month\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <select\n        class=\"form-control\"\n        type=\"text\"\n        id=\"{{componentId}}-month\"\n        aria-labelledby=\"{{ componentId }}-monthLabel\"\n        ng-model=\"date.month\"\n        auto-focus=\"{{ !component.dayFirst || component.fields.day.hide }}\"\n        ng-change=\"onChange()\"\n        ng-disabled=\"readOnly\"\n        ng-options=\"month.value as month.label | formioTranslate:null:options.building for month in months\"\n      ></select>\n    </div>\n    <label for=\"{{componentId}}-month\" id=\"{{componentId}}-monthLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.month.required}\" class=\"control-label--bottom\">{{ \"Month\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-3\" ng-if =\"!component.dayFirst && !component.fields.day.hide\">\n    <label for=\"{{componentId}}-day1\" id=\"{{componentId}}-day1Label\" ng-if=\"component.inputsLabelPosition !== 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-day1\"\n        ng-model=\"date.day\"\n        ng-change=\"onChange()\"\n        style=\"padding-right: 10px;\"\n        aria-labelledby=\"{{ componentId }}-day1Label\"\n        auto-focus=\"{{ component.fields.month.hide }}\"\n        ng-attr-placeholder=\"{{component.fields.day.placeholder}}\"\n        day-part\n        characters=\"2\"\n        min=\"1\"\n        max=\"{{maxDay}}\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-day1Label\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.day.required}\" class=\"control-label--bottom\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-5\" ng-if=\"!component.fields.year.hide\">\n    <label for=\"{{componentId}}-year\" id=\"{{componentId}}-yearLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\" ng-class=\"{'field-required': component.fields.year.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Year\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-year\"\n        ng-model=\"date.year\"\n        ng-change=\"onChange()\"\n        aria-labelledby=\"{{ componentId }}-yearLabel\"\n        style=\"padding-right: 10px;\"\n        ng-attr-placeholder=\"{{component.fields.year.placeholder}}\"\n        auto-focus=\"{{ component.fields.day.hide && component.fields.month.hide }}\"\n        characters=\"4\"\n        min=\"0\"\n        max=\"2100\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-year\" id=\"{{componentId}}-yearLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.year.required}\" class=\"control-label--bottom\">{{ \"Year\" | formioTranslate:null:options.building }}</label>\n  </div>\n</div>\n"
+        "<div class=\"daySelect form row\">\n  <div class=\"form-group col-xs-3\" ng-if=\"component.dayFirst && !component.fields.day.hide\">\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-dayLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n        <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-day\"\n        ng-model=\"date.day\"\n        ng-model-options=\"{allowInvalid: true}\"\n        aria-labelledby=\"{{ componentId }}-dayLabel\"\n        ng-change=\"onChange()\"\n        style=\"padding-right: 10px;\"\n        auto-focus=\"true\"\n        ng-attr-placeholder=\"{{component.fields.day.placeholder}}\"\n        day-part\n        characters=\"2\"\n        min=\"1\"\n        max=\"{{maxDay}}\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-dayLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" class=\"control-label--bottom\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-4\" ng-if=\"!component.fields.month.hide\">\n    <label for=\"{{componentId}}-month\" id=\"{{componentId}}-monthLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\" ng-class=\"{'field-required': component.fields.month.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Month\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <select\n        class=\"form-control\"\n        type=\"text\"\n        id=\"{{componentId}}-month\"\n        aria-labelledby=\"{{ componentId }}-monthLabel\"\n        ng-model=\"date.month\"\n        ng-model-options=\"{allowInvalid: true}\"\n        auto-focus=\"{{ !component.dayFirst || component.fields.day.hide }}\"\n        ng-change=\"onChange()\"\n        ng-disabled=\"readOnly\"\n        ng-options=\"month.value as month.label | formioTranslate:null:options.building for month in months\"\n      ></select>\n    </div>\n    <label for=\"{{componentId}}-month\" id=\"{{componentId}}-monthLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.month.required}\" class=\"control-label--bottom\">{{ \"Month\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-3\" ng-if =\"!component.dayFirst && !component.fields.day.hide\">\n    <label for=\"{{componentId}}-day1\" id=\"{{componentId}}-day1Label\" ng-if=\"component.inputsLabelPosition !== 'bottom'\"\n           ng-class=\"{'field-required': component.fields.day.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-day1\"\n        ng-model=\"date.day\"\n        ng-model-options=\"{allowInvalid: true}\"\n        ng-change=\"onChange()\"\n        style=\"padding-right: 10px;\"\n        aria-labelledby=\"{{ componentId }}-day1Label\"\n        auto-focus=\"{{ component.fields.month.hide }}\"\n        ng-attr-placeholder=\"{{component.fields.day.placeholder}}\"\n        day-part\n        characters=\"2\"\n        min=\"1\"\n        max=\"{{maxDay}}\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-day\" id=\"{{componentId}}-day1Label\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.day.required}\" class=\"control-label--bottom\">{{ \"Day\" | formioTranslate:null:options.building }}</label>\n  </div>\n  <div class=\"form-group col-xs-5\" ng-if=\"!component.fields.year.hide\">\n    <label for=\"{{componentId}}-year\" id=\"{{componentId}}-yearLabel\" ng-if=\"component.inputsLabelPosition !== 'bottom'\" ng-class=\"{'field-required': component.fields.year.required}\" ng-style=\"getLabelStyles(component)\">{{ \"Year\" | formioTranslate:null:options.building }}</label>\n    <div ng-style=\"getInputStyles(component)\">\n      <input\n        class=\"form-control\"\n        type=\"number\"\n        id=\"{{componentId}}-year\"\n        ng-model=\"date.year\"\n        ng-model-options=\"{allowInvalid: true}\"\n        ng-change=\"onChange()\"\n        aria-labelledby=\"{{ componentId }}-yearLabel\"\n        style=\"padding-right: 10px;\"\n        ng-attr-placeholder=\"{{component.fields.year.placeholder}}\"\n        auto-focus=\"{{ component.fields.day.hide && component.fields.month.hide }}\"\n        characters=\"4\"\n        min=\"0\"\n        max=\"2100\"\n        ng-disabled=\"readOnly\"\n      />\n    </div>\n    <label for=\"{{componentId}}-year\" id=\"{{componentId}}-yearLabel\" ng-if=\"component.inputsLabelPosition === 'bottom'\" ng-class=\"{'field-required': component.fields.year.required}\" class=\"control-label--bottom\">{{ \"Year\" | formioTranslate:null:options.building }}</label>\n  </div>\n</div>\n"
       );
     }
   ]);
 };
 
-},{}],291:[function(_dereq_,module,exports){
+},{}],288:[function(_dereq_,module,exports){
 "use strict";
 
 var formioUtils = _dereq_('formiojs/utils').default;
@@ -98409,12 +98920,12 @@ module.exports = function(app) {
     '$templateCache',
     'FormioUtils',
     function($templateCache, FormioUtils) {
-      $templateCache.put('formio/components/editgrid.html', "<div name=\"{{ componentId }}\" ng-model=\"data[component.key]\" custom-validator=\"component.validate.custom\" editgrid-validation ng-controller=\"formioEditGrid\">\n  <label ng-if=\"labelVisible()\" for=\"{{ component.key }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <div class=\"formio-data-grid\" id=\"formio-editgrid-{{ component.key }}\">\n    <ul class=\"list-group\">\n      <li ng-if=\"component.templates.header\" class=\"list-group-item list-group-header\">\n        <render-template template=\"component.templates.header\" data=\"headerData\" />\n      </li>\n      <li class=\"list-group-item\" ng-repeat=\"row in rows track by $index\" ng-init=\"rowIndex = $index\">\n        <div name=\"{{ componentId }}-row-{{ $index }}\" ng-model=\"row\" editgrid-row-validation>\n          <edit-grid-row />\n          <p class=\"help-block\" ng-show=\"openRows.indexOf($index) !== -1 && formioForm.$error.editgrid\">{{ 'Please save all rows before proceeding' | formioTranslate }}.</p>\n          <p class=\"help-block\" ng-show=\"formioForm[componentId + '-row-' + $index].$error.editgridrow\">{{ 'Please correct rows before proceeding' | formioTranslate }}.</p>\n        </div>\n      </li>\n      <li ng-if=\"component.templates.footer\" class=\"list-group-item list-group-footer\">\n        <render-template template=\"component.templates.footer\" data=\"headerData\" />\n      </li>\n    </ul>\n    <div class=\"datagrid-add\" ng-if=\"!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || rows.length < component.validate.maxLength\">\n      <a ng-click=\"addRow()\" class=\"btn btn-primary\">\n        <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addAnother || \"Add Another\" | formioTranslate:null:options.building }}\n      </a>\n    </div>\n  </div>\n  <formio-errors ng-if=\"::!options.building\"></formio-errors>\n</div>\n");
+      $templateCache.put('formio/components/editgrid.html', "<div name=\"{{ componentId }}\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" custom-validator=\"component.validate.custom\" editgrid-validation ng-controller=\"formioEditGrid\">\n  <label ng-if=\"labelVisible()\" for=\"{{ component.key }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <div class=\"formio-data-grid\" id=\"formio-editgrid-{{ component.key }}\">\n    <ul class=\"list-group\">\n      <li ng-if=\"component.templates.header\" class=\"list-group-item list-group-header\">\n        <render-template template=\"component.templates.header\" data=\"headerData\" />\n      </li>\n      <li class=\"list-group-item\" ng-repeat=\"row in rows track by $index\" ng-init=\"rowIndex = $index\">\n        <div name=\"{{ componentId }}-row-{{ $index }}\" ng-model=\"row\" ng-model-options=\"{allowInvalid: true}\" editgrid-row-validation>\n          <edit-grid-row />\n          <p class=\"help-block\" ng-show=\"openRows.indexOf($index) !== -1 && formioForm.$error.editgrid\">{{ 'Please save all rows before proceeding' | formioTranslate }}.</p>\n          <p class=\"help-block\" ng-show=\"formioForm[componentId + '-row-' + $index].$error.editgridrow\">{{ 'Please correct rows before proceeding' | formioTranslate }}.</p>\n        </div>\n      </li>\n      <li ng-if=\"component.templates.footer\" class=\"list-group-item list-group-footer\">\n        <render-template template=\"component.templates.footer\" data=\"headerData\" />\n      </li>\n    </ul>\n    <div class=\"datagrid-add\" ng-if=\"!component.hasOwnProperty('validate') || !component.validate.hasOwnProperty('maxLength') || rows.length < component.validate.maxLength\">\n      <a ng-click=\"addRow()\" class=\"btn btn-primary\">\n        <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addAnother || \"Add Another\" | formioTranslate:null:options.building }}\n      </a>\n    </div>\n  </div>\n  <formio-errors ng-if=\"::!options.building\"></formio-errors>\n</div>\n");
     }
   ]);
 };
 
-},{"formiojs/utils":276}],292:[function(_dereq_,module,exports){
+},{"formiojs/utils":35}],289:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -98449,7 +98960,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],293:[function(_dereq_,module,exports){
+},{}],290:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -98511,7 +99022,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],294:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],291:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -98523,7 +99034,7 @@ module.exports = function(app) {
         template: 'formio/components/file.html',
         group: 'advanced',
         tableView: function(data, options) {
-          if (!data) {
+          if (!data || data.length === 0) {
             return '';
           }
 
@@ -98853,7 +99364,7 @@ module.exports = function(app) {
       );
 
       $templateCache.put('formio/components/file.html',
-        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<div class=\"formio-errors\"><formio-errors ng-if=\"::!options.building\"></formio-errors></div>\n<div ng-controller=\"formioFileUpload\" ng-style=\"getInputGroupStyles(component)\">\n  <formio-file-list files=\"data[component.key]\" form=\"formio.formUrl\" ng-if=\"!component.image\" ng-required=\"isRequired(component)\" ng-model=\"data[component.key]\" name=\"{{ componentId }}\" read-only=\"readOnly\"></formio-file-list>\n  <formio-image-list files=\"data[component.key]\" form=\"formio.formUrl\" width=\"component.imageSize\" ng-if=\"component.image\" ng-required=\"isRequired(component)\" ng-model=\"data[component.key]\" name=\"{{ componentId }}\" read-only=\"readOnly\"></formio-image-list>\n  <div ng-if=\"!readOnly && (component.multiple || (!component.multiple && !data[component.key].length))\">\n    <div ngf-drop=\"upload($files, $invalidFiles)\"\n      class=\"fileSelector\"\n      ngf-drag-over-class=\"'fileDragOver'\"\n      ngf-pattern=\"component.filePattern\"\n      ngf-min-size=\"component.fileMinSize\"\n      ngf-max-size=\"component.fileMaxSize\"\n      ngf-multiple=\"component.multiple\"\n      id=\"{{ componentId }}\"\n      name=\"{{ componentId }}\">\n      <span class=\"glyphicon glyphicon-cloud-upload\"></span>Drop files to attach, or\n      <a style=\"cursor: pointer;\"\n        ng-keypress=\"browseKeyPress($event)\"\n        ng-attr-id=\"{{component.key}}-browse\"\n        ngf-select=\"upload($files, $invalidFiles)\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        ngf-pattern=\"component.filePattern\"\n        ngf-min-size=\"component.fileMinSize\"\n        ngf-max-size=\"component.fileMaxSize\"\n        ngf-multiple=\"component.multiple\">browse</a>.\n    </div>\n    <div ng-if=\"!component.storage\" class=\"alert alert-warning\">No storage has been set for this field. File uploads are disabled until storage is set up.</div>\n    <div ngf-no-file-drop>File Drag/Drop is not supported for this browser</div>\n  </div>\n  <div ng-repeat=\"fileUpload in fileUploads track by $index\" ng-class=\"{'has-error': fileUpload.status === 'error'}\" class=\"file\">\n    <div class=\"row\">\n      <div class=\"fileName control-label col-sm-10\">{{ fileUpload.originalName || fileUpload.name }} <span ng-click=\"removeUpload(fileUpload.name)\" class=\"glyphicon glyphicon-remove\"></span></div>\n      <div class=\"fileSize control-label col-sm-2 text-right\">{{ fileSize(fileUpload.size) }}</div>\n    </div>\n    <div class=\"row\">\n      <div class=\"col-sm-12\">\n        <span ng-if=\"fileUpload.status === 'progress'\">\n          <div class=\"progress\">\n            <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"{{fileUpload.progress}}\" aria-valuemin=\"0\" aria-valuemax=\"100\" style=\"width:{{fileUpload.progress}}%\">\n              <span class=\"sr-only\">{{fileUpload.progress}}% Complete</span>\n            </div>\n          </div>\n        </span>\n        <div ng-if=\"!fileUpload.status !== 'progress'\" class=\"bg-{{ fileUpload.status }} control-label\">{{ fileUpload.message }}</div>\n      </div>\n    </div>\n  </div>\n</div>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n"
+        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<div class=\"formio-errors\"><formio-errors ng-if=\"::!options.building\"></formio-errors></div>\n<div ng-controller=\"formioFileUpload\" ng-style=\"getInputGroupStyles(component)\">\n  <formio-file-list files=\"data[component.key]\" form=\"formio.formUrl\" ng-if=\"!component.image\" ng-required=\"isRequired(component)\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" name=\"{{ componentId }}\" read-only=\"readOnly\"></formio-file-list>\n  <formio-image-list files=\"data[component.key]\" form=\"formio.formUrl\" width=\"component.imageSize\" ng-if=\"component.image\" ng-required=\"isRequired(component)\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" name=\"{{ componentId }}\" read-only=\"readOnly\"></formio-image-list>\n  <div ng-if=\"!readOnly && (component.multiple || (!component.multiple && !data[component.key].length))\">\n    <div ngf-drop=\"upload($files, $invalidFiles)\"\n      class=\"fileSelector\"\n      ngf-drag-over-class=\"'fileDragOver'\"\n      ngf-pattern=\"component.filePattern\"\n      ngf-min-size=\"component.fileMinSize\"\n      ngf-max-size=\"component.fileMaxSize\"\n      ngf-multiple=\"component.multiple\"\n      id=\"{{ componentId }}\"\n      name=\"{{ componentId }}\">\n      <span class=\"glyphicon glyphicon-cloud-upload\"></span>Drop files to attach, or\n      <a style=\"cursor: pointer;\"\n        ng-keypress=\"browseKeyPress($event)\"\n        ng-attr-id=\"{{component.key}}-browse\"\n        ngf-select=\"upload($files, $invalidFiles)\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        ngf-pattern=\"component.filePattern\"\n        ngf-min-size=\"component.fileMinSize\"\n        ngf-max-size=\"component.fileMaxSize\"\n        ngf-multiple=\"component.multiple\">browse</a>.\n    </div>\n    <div ng-if=\"!component.storage\" class=\"alert alert-warning\">No storage has been set for this field. File uploads are disabled until storage is set up.</div>\n    <div ngf-no-file-drop>File Drag/Drop is not supported for this browser</div>\n  </div>\n  <div ng-repeat=\"fileUpload in fileUploads track by $index\" ng-class=\"{'has-error': fileUpload.status === 'error'}\" class=\"file\">\n    <div class=\"row\">\n      <div class=\"fileName control-label col-sm-10\">{{ fileUpload.originalName || fileUpload.name }} <span ng-click=\"removeUpload(fileUpload.name)\" class=\"glyphicon glyphicon-remove\"></span></div>\n      <div class=\"fileSize control-label col-sm-2 text-right\">{{ fileSize(fileUpload.size) }}</div>\n    </div>\n    <div class=\"row\">\n      <div class=\"col-sm-12\">\n        <span ng-if=\"fileUpload.status === 'progress'\">\n          <div class=\"progress\">\n            <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"{{fileUpload.progress}}\" aria-valuemin=\"0\" aria-valuemax=\"100\" style=\"width:{{fileUpload.progress}}%\">\n              <span class=\"sr-only\">{{fileUpload.progress}}% Complete</span>\n            </div>\n          </div>\n        </span>\n        <div ng-if=\"!fileUpload.status !== 'progress'\" class=\"bg-{{ fileUpload.status }} control-label\">{{ fileUpload.message }}</div>\n      </div>\n    </div>\n  </div>\n</div>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n"
       );
 
       $templateCache.put('formio/componentsView/file.html',
@@ -98863,7 +99374,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],295:[function(_dereq_,module,exports){
+},{}],292:[function(_dereq_,module,exports){
 "use strict";
 
 var isEmpty = _dereq_('lodash/isEmpty');
@@ -99053,7 +99564,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333,"lodash/isEmpty":225}],296:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330,"lodash/isEmpty":233}],293:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -99083,13 +99594,13 @@ module.exports = function(app) {
     '$templateCache',
     function($templateCache) {
       $templateCache.put('formio/components/hidden.html',
-        "<input type=\"hidden\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" ng-model=\"data[component.key]\">\n"
+        "<input type=\"hidden\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\">\n"
       );
     }
   ]);
 };
 
-},{"../factories/GridUtils":333}],297:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],294:[function(_dereq_,module,exports){
 "use strict";
 
 
@@ -99183,7 +99694,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],298:[function(_dereq_,module,exports){
+},{}],295:[function(_dereq_,module,exports){
 "use strict";
 var app = angular.module('formio');
 
@@ -99228,7 +99739,7 @@ _dereq_('./panel')(app);
 _dereq_('./table')(app);
 _dereq_('./well')(app);
 
-},{"./address":279,"./button":280,"./checkbox":281,"./columns":282,"./components":283,"./container":284,"./content":285,"./currency":286,"./custom":287,"./datagrid":288,"./datetime":289,"./day":290,"./editgrid":291,"./email":292,"./fieldset":293,"./file":294,"./form":295,"./hidden":296,"./htmlelement":297,"./number":299,"./page":300,"./panel":301,"./password":302,"./phonenumber":303,"./radio":304,"./resource":305,"./select":306,"./selectboxes":307,"./signature":308,"./survey":309,"./table":310,"./textarea":311,"./textfield":312,"./time":313,"./well":314}],299:[function(_dereq_,module,exports){
+},{"./address":276,"./button":277,"./checkbox":278,"./columns":279,"./components":280,"./container":281,"./content":282,"./currency":283,"./custom":284,"./datagrid":285,"./datetime":286,"./day":287,"./editgrid":288,"./email":289,"./fieldset":290,"./file":291,"./form":292,"./hidden":293,"./htmlelement":294,"./number":296,"./page":297,"./panel":298,"./password":299,"./phonenumber":300,"./radio":301,"./resource":302,"./select":303,"./selectboxes":304,"./signature":305,"./survey":306,"./table":307,"./textarea":308,"./textfield":309,"./time":310,"./well":311}],296:[function(_dereq_,module,exports){
 "use strict";
 
 var createNumberMask = _dereq_('text-mask-addons').createNumberMask;
@@ -99319,13 +99830,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/number.html', FormioUtils.fieldWrap(
-        "<input\n  type=\"text\"\n  inputmode=\"numeric\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-model=\"data[component.key]\"\n  ng-required=\"isRequired(component)\"\n  ng-disabled=\"readOnly\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  formio-min=\"{{ component.validate.min }}\"\n  formio-max=\"{{ component.validate.max }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  formio-mask=\"number\"\n>\n"
+        "<input\n  type=\"text\"\n  inputmode=\"numeric\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  ng-required=\"isRequired(component)\"\n  ng-disabled=\"readOnly\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  formio-min=\"{{ component.validate.min }}\"\n  formio-max=\"{{ component.validate.max }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  formio-mask=\"number\"\n>\n"
       ));
     }
   ]);
 };
 
-},{"lodash/get":216,"lodash/isNil":232,"text-mask-addons":352}],300:[function(_dereq_,module,exports){
+},{"lodash/get":224,"lodash/isNil":240,"text-mask-addons":349}],297:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -99352,7 +99863,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],301:[function(_dereq_,module,exports){
+},{}],298:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -99415,7 +99926,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],302:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],299:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -99447,7 +99958,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],303:[function(_dereq_,module,exports){
+},{}],300:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -99484,7 +99995,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],304:[function(_dereq_,module,exports){
+},{}],301:[function(_dereq_,module,exports){
 "use strict";
 
 
@@ -99531,13 +100042,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/radio.html', FormioUtils.fieldWrap(
-        "<ng-form name=\"{{ componentId }}\" ng-model=\"data[component.key]\" custom-validator=\"component.validate.custom\">\n  <fieldset ng-if=\"component.fieldSet\">\n    <legend ng-if=\"component.label\">\n      {{ component.label }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </legend>\n    <div ng-class=\"component.inline ? 'radio-inline' : 'radio'\" ng-repeat=\"v in component.values track by $index\">\n      <label class=\"control-label\" for=\"{{ componentId }}-{{ v.value }}\" id=\"{{ componentId +'-'+ v.value+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n        <span ng-if=\"topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building }}</span>\n        <input\n          type=\"{{ component.inputType }}\"\n          id=\"{{ componentId }}-{{ v.value }}\"\n          value=\"{{ v.value }}\"\n          tabindex=\"{{ component.tabindex || 0 }}\"\n          ng-model=\"data[component.key]\"\n          aria-labelledby=\"{{componentId +'-'+ v.value+'Label'}}\"\n          ng-required=\"isRequired(component)\"\n          custom-validator=\"component.validate.custom\"\n          auto-focus=\"{{ $first }}\"\n          ng-disabled=\"readOnly\"\n          ng-style=\"getOptionInputStyles(component)\"\n        >\n        <span ng-if=\"!topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building | shortcut:v.shortcut }}</span>\n      </label>\n    </div>\n  </fieldset>\n  <div ng-class=\"component.inline ? 'radio-inline' : 'radio'\" ng-repeat=\"v in component.values track by $index\"\n       ng-if=\"!component.fieldSet\">\n    <label class=\"control-label\" for=\"{{ componentId }}-{{ v.value }}\" id=\"{{ componentId +'-'+ v.value+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n      <span ng-if=\"topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building }}</span>\n      <input\n        type=\"{{ component.inputType }}\"\n        id=\"{{ componentId }}-{{ v.value }}\"\n        value=\"{{ v.value }}\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        aria-labelledby=\"{{componentId +'-'+ v.value+'Label'}}\"\n        ng-model=\"data[component.key]\"\n        auto-focus=\"{{ $first }}\"\n        ng-required=\"isRequired(component)\"\n        custom-validator=\"component.validate.custom\"\n        ng-disabled=\"readOnly\"\n        ng-style=\"getOptionInputStyles(component)\"\n      >\n      <span ng-if=\"!topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building | shortcut:v.shortcut }}</span>\n    </label>\n  </div>\n</ng-form>\n"
+        "<ng-form name=\"{{ componentId }}\" ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" custom-validator=\"component.validate.custom\">\n  <fieldset ng-if=\"component.fieldSet\">\n    <legend ng-if=\"component.label\">\n      {{ component.label }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </legend>\n    <div ng-class=\"component.inline ? 'radio-inline' : 'radio'\" ng-repeat=\"v in component.values track by $index\">\n      <label class=\"control-label\" for=\"{{ componentId }}-{{ v.value }}\" id=\"{{ componentId +'-'+ v.value+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n        <span ng-if=\"topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building }}</span>\n        <input\n          type=\"{{ component.inputType }}\"\n          id=\"{{ componentId }}-{{ v.value }}\"\n          value=\"{{ v.value }}\"\n          tabindex=\"{{ component.tabindex || 0 }}\"\n          ng-model=\"data[component.key]\"\n          ng-model-options=\"{allowInvalid: true}\"\n          aria-labelledby=\"{{componentId +'-'+ v.value+'Label'}}\"\n          ng-required=\"isRequired(component)\"\n          custom-validator=\"component.validate.custom\"\n          auto-focus=\"{{ $first }}\"\n          ng-disabled=\"readOnly\"\n          ng-style=\"getOptionInputStyles(component)\"\n        >\n        <span ng-if=\"!topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building | shortcut:v.shortcut }}</span>\n      </label>\n    </div>\n  </fieldset>\n  <div ng-class=\"component.inline ? 'radio-inline' : 'radio'\" ng-repeat=\"v in component.values track by $index\"\n       ng-if=\"!component.fieldSet\">\n    <label class=\"control-label\" for=\"{{ componentId }}-{{ v.value }}\" id=\"{{ componentId +'-'+ v.value+'Label' }}\" ng-style=\"getOptionLabelStyles(component)\">\n      <span ng-if=\"topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building }}</span>\n      <input\n        type=\"{{ component.inputType }}\"\n        id=\"{{ componentId }}-{{ v.value }}\"\n        value=\"{{ v.value }}\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        aria-labelledby=\"{{componentId +'-'+ v.value+'Label'}}\"\n        ng-model=\"data[component.key]\"\n        ng-model-options=\"{allowInvalid: true}\"\n        auto-focus=\"{{ $first }}\"\n        ng-required=\"isRequired(component)\"\n        custom-validator=\"component.validate.custom\"\n        ng-disabled=\"readOnly\"\n        ng-style=\"getOptionInputStyles(component)\"\n      >\n      <span ng-if=\"!topOrLeftOptionLabel(component)\">{{ v.label | formioTranslate:null:options.building | shortcut:v.shortcut }}</span>\n    </label>\n  </div>\n</ng-form>\n"
       ));
     }
   ]);
 };
 
-},{}],305:[function(_dereq_,module,exports){
+},{}],302:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -99776,7 +100287,7 @@ module.exports = function(app) {
     '$templateCache',
     function($templateCache) {
       $templateCache.put('formio/components/resource.html',
-        "<div ng-if=\"!component.addResource\">\n  <label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\"\n         id=\"{{ componentId+'Label'}}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n  <ui-select ui-select-required safe-multiple-to-single ng-model=\"data[component.key]\" ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\"  aria-labelledby=\"{{ componentId +'Label'}}\"\n             aria-describedby=\"{{componentId + 'Desc'}}\" theme=\"bootstrap\" tabindex=\"{{ component.tabindex || 0 }}\" ng-style=\"getInputGroupStyles(component)\">\n    <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n      <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n    </ui-select-match>\n    <ui-select-choices class=\"ui-select-choices\" repeat=\"item in selectItems | filter: $select.search\" refresh=\"refreshSubmissions($select.search)\" refresh-delay=\"250\">\n      <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n      <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"resourceLoading\">Load more...</button>\n    </ui-select-choices>\n  </ui-select>\n  <label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\"\n         id=\"{{ componentId+'Label' }}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <formio-errors ng-if=\"::!options.building\"></formio-errors>\n</div>\n<div ng-if=\"component.addResource\">\n  <table class=\"table table-bordered\">\n    <label ng-if=\"labelVisible()\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\">\n      {{ component.label | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </label>\n    <span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n    <tr>\n      <td>\n        <ui-select ui-select-required safe-multiple-to-single ng-model=\"data[component.key]\" ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" theme=\"bootstrap\" tabindex=\"{{ component.tabindex || 0 }}\">\n          <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n            <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n          </ui-select-match>\n          <ui-select-choices class=\"ui-select-choices\" repeat=\"item in selectItems | filter: $select.search\" refresh=\"refreshSubmissions($select.search)\" refresh-delay=\"250\">\n            <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n            <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"resourceLoading\">Load more...</button>\n          </ui-select-choices>\n        </ui-select>\n        <formio-errors ng-if=\"::!options.building\"></formio-errors>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <a ng-click=\"newResource()\" class=\"btn btn-primary\">\n          <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addResourceLabel || \"Add Resource\" | formioTranslate:null:options.building}}\n        </a>\n      </td>\n    </tr>\n  </table>\n</div>\n"
+        "<div ng-if=\"!component.addResource\">\n  <label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\" ng-style=\"getLabelStyles(component)\"\n         id=\"{{ componentId+'Label'}}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n  <ui-select ui-select-required safe-multiple-to-single ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\"  aria-labelledby=\"{{ componentId +'Label'}}\"\n             aria-describedby=\"{{componentId + 'Desc'}}\" theme=\"bootstrap\" tabindex=\"{{ component.tabindex || 0 }}\" ng-style=\"getInputGroupStyles(component)\">\n    <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n      <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n    </ui-select-match>\n    <ui-select-choices class=\"ui-select-choices\" repeat=\"item in selectItems | filter: $select.search\" refresh=\"refreshSubmissions($select.search)\" refresh-delay=\"250\">\n      <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n      <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"resourceLoading\">Load more...</button>\n    </ui-select-choices>\n  </ui-select>\n  <label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\"\n         id=\"{{ componentId+'Label' }}\">\n    {{ component.label | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </label>\n  <formio-errors ng-if=\"::!options.building\"></formio-errors>\n</div>\n<div ng-if=\"component.addResource\">\n  <table class=\"table table-bordered\">\n    <label ng-if=\"labelVisible()\" for=\"{{ componentId }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\">\n      {{ component.label | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </label>\n    <span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n    <tr>\n      <td>\n        <ui-select ui-select-required safe-multiple-to-single ng-model=\"data[component.key]\" ng-model-options=\"{allowInvalid: true}\" ng-disabled=\"readOnly\" ng-required=\"isRequired(component)\" id=\"{{ componentId }}\" name=\"{{ componentId }}\" theme=\"bootstrap\" tabindex=\"{{ component.tabindex || 0 }}\">\n          <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n            <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n          </ui-select-match>\n          <ui-select-choices class=\"ui-select-choices\" repeat=\"item in selectItems | filter: $select.search\" refresh=\"refreshSubmissions($select.search)\" refresh-delay=\"250\">\n            <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n            <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"resourceLoading\">Load more...</button>\n          </ui-select-choices>\n        </ui-select>\n        <formio-errors ng-if=\"::!options.building\"></formio-errors>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <a ng-click=\"newResource()\" class=\"btn btn-primary\">\n          <span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> {{ component.addResourceLabel || \"Add Resource\" | formioTranslate:null:options.building}}\n        </a>\n      </td>\n    </tr>\n  </table>\n</div>\n"
       );
 
       // Change the ui-select to ui-select multiple.
@@ -99787,7 +100298,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],306:[function(_dereq_,module,exports){
+},{}],303:[function(_dereq_,module,exports){
 "use strict";
 /*eslint max-depth: ["error", 6]*/
 
@@ -100391,7 +100902,7 @@ module.exports = function(app) {
     '$templateCache',
     function($templateCache) {
       $templateCache.put('formio/components/select.html',
-        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" id=\"{{ componentId+'Label' }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\"\n       ng-style=\"getLabelStyles(component)\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<ui-select\n  ui-select-required\n  ng-model=\"data[component.key]\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  name=\"{{ componentId }}\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  id=\"{{ componentId }}\"\n  theme=\"bootstrap\"\n  custom-validator=\"component.validate.custom\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-style=\"getInputGroupStyles(component)\"\n>\n  <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n    <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n  </ui-select-match>\n  <ui-select-choices class=\"ui-select-choices\" repeat=\"getSelectItem(item) as item in selectItems | filter: $select.search\" refresh=\"refreshItems($select.search)\" refresh-delay=\"250\">\n    <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n    <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"selectLoading\">Load more...</button>\n  </ui-select-choices>\n</ui-select>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<div ng-if=\"!!component.description\" class=\"help-block\">\n  <span id=\"{{ componentId+'Desc' }}\">{{ component.description }}</span>\n</div>\n<formio-errors ng-if=\"::!options.building\"></formio-errors>\n"
+        "<label ng-if=\"labelVisible() && (component.labelPosition !== 'bottom')\" for=\"{{ componentId }}\" id=\"{{ componentId+'Label' }}\" class=\"control-label\" ng-class=\"{'field-required': isRequired(component)}\"\n       ng-style=\"getLabelStyles(component)\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<span ng-if=\"!component.label && isRequired(component)\" class=\"glyphicon glyphicon-asterisk form-control-feedback field-required-inline\" aria-hidden=\"true\"></span>\n<ui-select\n  ui-select-required\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  name=\"{{ componentId }}\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  id=\"{{ componentId }}\"\n  theme=\"bootstrap\"\n  custom-validator=\"component.validate.custom\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-style=\"getInputGroupStyles(component)\"\n>\n  <ui-select-match class=\"ui-select-match\" placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\">\n    <formio-select-item template=\"component.template\" item=\"$item || $select.selected\" select=\"$select\"></formio-select-item>\n  </ui-select-match>\n  <ui-select-choices class=\"ui-select-choices\" repeat=\"getSelectItem(item) as item in selectItems | filter: $select.search\" refresh=\"refreshItems($select.search)\" refresh-delay=\"250\">\n    <formio-select-item template=\"component.template\" item=\"item\" select=\"$select\"></formio-select-item>\n    <button ng-if=\"hasNextPage && ($index == $select.items.length-1)\" class=\"btn btn-success btn-block\" ng-click=\"loadMoreItems($select, $event)\" ng-disabled=\"selectLoading\">Load more...</button>\n  </ui-select-choices>\n</ui-select>\n<label ng-if=\"labelVisible() && (component.labelPosition === 'bottom')\" for=\"{{ componentId }}\" class=\"control-label control-label--bottom\" ng-class=\"{'field-required': isRequired(component)}\">\n  {{ component.label | formioTranslate:null:options.building }}\n  <formio-component-tooltip></formio-component-tooltip>\n</label>\n<div ng-if=\"!!component.description\" class=\"help-block\">\n  <span id=\"{{ componentId+'Desc' }}\">{{ component.description }}</span>\n</div>\n<formio-errors ng-if=\"::!options.building\"></formio-errors>\n"
       );
 
       // Change the ui-select to ui-select multiple.
@@ -100402,7 +100913,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/assign":204,"lodash/cloneDeep":208,"lodash/get":216,"lodash/isEqual":226,"lodash/isNil":232,"lodash/mapValues":244,"lodash/set":253}],307:[function(_dereq_,module,exports){
+},{"lodash/assign":212,"lodash/cloneDeep":216,"lodash/get":224,"lodash/isEqual":234,"lodash/isNil":240,"lodash/mapValues":252,"lodash/set":261}],304:[function(_dereq_,module,exports){
 "use strict";
 
 
@@ -100528,7 +101039,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],308:[function(_dereq_,module,exports){
+},{}],305:[function(_dereq_,module,exports){
 "use strict";
 
 var SignaturePad = _dereq_('signature_pad');
@@ -100660,7 +101171,7 @@ module.exports = function(app) {
     function($templateCache,
               FormioUtils) {
       $templateCache.put('formio/components/signature.html', FormioUtils.fieldWrap(
-        "<div ng-if=\"readOnly\">\n  <div ng-if=\"data[component.key] === 'YES'\">\n    [ Signature is hidden ]\n  </div>\n  <div ng-if=\"!data[component.key]\">\n    <div ng-style=\"{width: component.width, height: '150px', backgroundColor: component.backgroundColor, cursor: 'not-allowed'}\"></div>\n    <div class=\"formio-signature-footer\" style=\"text-align: center;color:#C3C3C3;\" ng-class=\"{'field-required': isRequired(component)}\">\n      {{ component.footer | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </div>\n  </div>\n  <div ng-if=\"data[component.key] && data[component.key] !== 'YES'\">\n    <img class=\"signature\" ng-attr-src=\"{{data[component.key]}}\" src=\"\" />\n  </div>\n</div>\n<div ng-if=\"!readOnly\" ng-style=\"{width: component.width, height: '100%'}\">\n  <a class=\"btn btn-xs btn-default\" style=\"position:absolute; left: 0; top: 0; z-index: 1000\" ng-click=\"component.clearSignature()\">\n    <span class=\"glyphicon glyphicon-refresh\"></span>\n  </a>\n  <canvas\n    signature\n    component=\"component\"\n    name=\"{{ componentId }}\"\n    ng-model=\"data[component.key]\"\n    tabindex=\"{{ component.tabindex || 0 }}\"\n    auto-focus=\"true\"\n    ng-required=\"isRequired(component)\"\n  ></canvas>\n  <div class=\"formio-signature-footer\" style=\"text-align: center;color:#C3C3C3;\" ng-class=\"{'field-required': isRequired(component)}\">\n    {{ component.footer | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </div>\n</div>\n"
+        "<div ng-if=\"readOnly\">\n  <div ng-if=\"data[component.key] === 'YES'\">\n    [ Signature is hidden ]\n  </div>\n  <div ng-if=\"!data[component.key]\">\n    <div ng-style=\"{width: component.width, height: '150px', backgroundColor: component.backgroundColor, cursor: 'not-allowed'}\"></div>\n    <div class=\"formio-signature-footer\" style=\"text-align: center;color:#C3C3C3;\" ng-class=\"{'field-required': isRequired(component)}\">\n      {{ component.footer | formioTranslate:null:options.building }}\n      <formio-component-tooltip></formio-component-tooltip>\n    </div>\n  </div>\n  <div ng-if=\"data[component.key] && data[component.key] !== 'YES'\">\n    <img class=\"signature\" ng-attr-src=\"{{data[component.key]}}\" src=\"\" />\n  </div>\n</div>\n<div ng-if=\"!readOnly\" ng-style=\"{width: component.width, height: '100%'}\">\n  <a class=\"btn btn-xs btn-default\" style=\"position:absolute; left: 0; top: 0; z-index: 1000\" ng-click=\"component.clearSignature()\">\n    <span class=\"glyphicon glyphicon-refresh\"></span>\n  </a>\n  <canvas\n    signature\n    component=\"component\"\n    name=\"{{ componentId }}\"\n    ng-model=\"data[component.key]\"\n    ng-model-options=\"{allowInvalid: true}\"\n    tabindex=\"{{ component.tabindex || 0 }}\"\n    auto-focus=\"true\"\n    ng-required=\"isRequired(component)\"\n  ></canvas>\n  <div class=\"formio-signature-footer\" style=\"text-align: center;color:#C3C3C3;\" ng-class=\"{'field-required': isRequired(component)}\">\n    {{ component.footer | formioTranslate:null:options.building }}\n    <formio-component-tooltip></formio-component-tooltip>\n  </div>\n</div>\n"
       ));
 
       $templateCache.put('formio/componentsView/signature.html', FormioUtils.fieldWrap(
@@ -100670,7 +101181,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"signature_pad":351}],309:[function(_dereq_,module,exports){
+},{"signature_pad":348}],306:[function(_dereq_,module,exports){
 "use strict";
 
 
@@ -100725,13 +101236,13 @@ module.exports = function(app) {
     'FormioUtils',
     function($templateCache, FormioUtils) {
       $templateCache.put('formio/components/survey.html', FormioUtils.fieldWrap(
-        "<table class=\"table table-striped table-bordered\">\n  <thead>\n    <tr>\n      <td></td>\n      <th ng-repeat=\"v in component.values track by $index\" style=\"text-align: center;\">{{ v.label }}</th>\n    </tr>\n  </thead>\n  <tr ng-repeat=\"question in component.questions\"\n    ng-init=\"inputName = componentId + '-' + question.value\"\n    ng-class=\"{\n      'text-danger': !formioForm[inputName].$pristine && formioForm[inputName].$invalid\n    }\">\n    <td>{{ question.label }}</td>\n    <td ng-repeat=\"v in component.values track by $index\" style=\"text-align: center;\">\n      <input\n        type=\"radio\"\n        id=\"{{ componentId }}-{{ question.value }}-{{ v.value }}\" name=\"{{ componentId }}-{{ question.value }}\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        ng-value=\"v.value\"\n        auto-focus=\"{{ $parent.$first && $first }}\"\n        ng-model=\"data[component.key][question.value]\"\n        ng-required=\"isRequired(component)\"\n        ng-disabled=\"readOnly\"\n        custom-validator=\"component.validate.custom\"\n      >\n    </td>\n  </tr>\n</table>\n"
+        "<table class=\"table table-striped table-bordered\">\n  <thead>\n    <tr>\n      <td></td>\n      <th ng-repeat=\"v in component.values track by $index\" style=\"text-align: center;\">{{ v.label }}</th>\n    </tr>\n  </thead>\n  <tr ng-repeat=\"question in component.questions\"\n    ng-init=\"inputName = componentId + '-' + question.value\"\n    ng-class=\"{\n      'text-danger': !formioForm[inputName].$pristine && formioForm[inputName].$invalid\n    }\">\n    <td>{{ question.label }}</td>\n    <td ng-repeat=\"v in component.values track by $index\" style=\"text-align: center;\">\n      <input\n        type=\"radio\"\n        id=\"{{ componentId }}-{{ question.value }}-{{ v.value }}\" name=\"{{ componentId }}-{{ question.value }}\"\n        tabindex=\"{{ component.tabindex || 0 }}\"\n        ng-value=\"v.value\"\n        auto-focus=\"{{ $parent.$first && $first }}\"\n        ng-model=\"data[component.key][question.value]\"\n        ng-model-options=\"{allowInvalid: true}\"\n        ng-required=\"isRequired(component)\"\n        ng-disabled=\"readOnly\"\n        custom-validator=\"component.validate.custom\"\n      >\n    </td>\n  </tr>\n</table>\n"
       ));
     }
   ]);
 };
 
-},{}],310:[function(_dereq_,module,exports){
+},{}],307:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -100817,7 +101328,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],311:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],308:[function(_dereq_,module,exports){
 "use strict";
 
 module.exports = function(app) {
@@ -100943,22 +101454,22 @@ module.exports = function(app) {
     function($templateCache,
               FormioUtils) {
       $templateCache.put('formio/components/textarea.html', FormioUtils.fieldWrap(
-        "<textarea\n  class=\"form-control\"\n  ng-model=\"data[component.key]\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></textarea>\n"
+        "<textarea\n  class=\"form-control\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></textarea>\n"
       ));
       $templateCache.put('formio/componentsView/content.html', FormioUtils.fieldWrap(
         "<div class=\"well\" id=\"formio-content-{{ component.key }}\" style=\"margin:0;\">\n  <div ng-bind-html=\"html\"></div>\n</div>\n"
       ));
       $templateCache.put('formio/components/texteditor.html', FormioUtils.fieldWrap(
-        "<textarea\n  class=\"form-control\"\n  ng-model=\"data[component.key]\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  ckeditor=\"component.wysiwyg\"\n  formio-ckeditor=\"component.wysiwyg\"\n  safe-multiple-to-single\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></textarea>\n"
+        "<textarea\n  class=\"form-control\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  ckeditor=\"component.wysiwyg\"\n  formio-ckeditor=\"component.wysiwyg\"\n  safe-multiple-to-single\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></textarea>\n"
       ));
       $templateCache.put('formio/components/scripteditor.html', FormioUtils.fieldWrap(
-        "<formio-script-editor\n  ng-model=\"data[component.key]\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  safe-multiple-to-single\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></formio-script-editor>\n\n"
+        "<formio-script-editor\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  ng-disabled=\"readOnly\"\n  ng-required=\"isRequired(component)\"\n  safe-multiple-to-single\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  custom-validator=\"component.validate.custom\"\n  rows=\"{{ component.rows }}\"\n></formio-script-editor>\n\n"
       ));
     }
   ]);
 };
 
-},{}],312:[function(_dereq_,module,exports){
+},{}],309:[function(_dereq_,module,exports){
 "use strict";
 
 
@@ -101015,13 +101526,13 @@ module.exports = function(app) {
       FormioUtils
     ) {
       $templateCache.put('formio/components/textfield.html', FormioUtils.fieldWrap(
-        "<input\n  type=\"{{ component.mask ? 'password' : component.inputType }}\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-disabled=\"readOnly\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{ debounce: 500 }\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  ng-minlength=\"component.validate.minLength\"\n  ng-maxlength=\"component.validate.maxLength\"\n  ng-pattern=\"component.validate.pattern\"\n  custom-validator=\"component.validate.custom\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  formio-mask\n>\n"
+        "<input\n  type=\"{{ component.mask ? 'password' : component.inputType }}\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-disabled=\"readOnly\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{ allowInvalid: true, debounce: 500 }\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-required=\"isRequired(component)\"\n  spellcheck=\"{{ component.spellcheck }}\"\n  ng-minlength=\"component.validate.minLength\"\n  ng-maxlength=\"component.validate.maxLength\"\n  ng-pattern=\"component.validate.pattern\"\n  custom-validator=\"component.validate.custom\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n  formio-mask\n>\n"
       ));
     }
   ]);
 };
 
-},{}],313:[function(_dereq_,module,exports){
+},{}],310:[function(_dereq_,module,exports){
 "use strict";
 
 var moment = _dereq_('moment');
@@ -101088,13 +101599,13 @@ module.exports = function(app) {
       FormioUtils
     ) {
       $templateCache.put('formio/components/time.html', FormioUtils.fieldWrap(
-        "<input\n  time-format\n  type=\"{{ component.inputType }}\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-disabled=\"readOnly\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-model=\"data[component.key]\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  ng-required=\"isRequired(component)\"\n  ng-pattern=\"component.validate.pattern\"\n  custom-validator=\"component.validate.custom\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n>\n"
+        "<input\n  time-format\n  type=\"{{ component.inputType }}\"\n  class=\"form-control\"\n  id=\"{{ componentId }}\"\n  name=\"{{ componentId }}\"\n  tabindex=\"{{ component.tabindex || 0 }}\"\n  ng-disabled=\"readOnly\"\n  aria-labelledby=\"{{ componentId +'Label'}}\"\n  aria-describedby=\"{{componentId + 'Desc'}}\"\n  ng-model=\"data[component.key]\"\n  ng-model-options=\"{allowInvalid: true}\"\n  safe-multiple-to-single\n  auto-focus=\"true\"\n  ng-required=\"isRequired(component)\"\n  ng-pattern=\"component.validate.pattern\"\n  custom-validator=\"component.validate.custom\"\n  ng-attr-placeholder=\"{{ component.placeholder | formioTranslate:null:options.building }}\"\n>\n"
       ));
     }
   ]);
 };
 
-},{"moment":263}],314:[function(_dereq_,module,exports){
+},{"moment":271}],311:[function(_dereq_,module,exports){
 "use strict";
 
 var GridUtils = _dereq_('../factories/GridUtils')();
@@ -101154,7 +101665,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"../factories/GridUtils":333}],315:[function(_dereq_,module,exports){
+},{"../factories/GridUtils":330}],312:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -101209,7 +101720,6 @@ module.exports = function() {
         var row = scope.data;
         /*eslint-enable no-unused-vars */
 
-        var component = scope.component;
         var custom = scope.component.validate.custom;
         custom = custom.replace(/({{\s{0,}(.*[^\s]){1}\s{0,}}})/g, function(match, $1, $2) {
           return _get(scope.submission.data, $2);
@@ -101233,7 +101743,7 @@ module.exports = function() {
   };
 };
 
-},{}],316:[function(_dereq_,module,exports){
+},{}],313:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -101327,13 +101837,22 @@ module.exports = function() {
           });
         };
 
+        var sendIframeForm = function(form) {
+          if ($scope.formio) {
+            form.projectUrl = $scope.formio.projectUrl;
+            form.url = $scope.formio.formUrl;
+            form.base = $scope.formio.base;
+          }
+          sendIframeMessage({name: 'form', data: form});
+        };
+
         $scope.$on('iframe-ready', function() {
           $scope.iframeReady = true;
           var iframe = $element.find('.formio-iframe')[0];
           if (iframe) {
             iframeReady.resolve(iframe);
             if ($scope.form) {
-              sendIframeMessage({name: 'form', data: $scope.form});
+              sendIframeForm($scope.form);
             }
             if ($scope.submission) {
               $scope.submission.readOnly = $scope.readOnly;
@@ -101352,7 +101871,7 @@ module.exports = function() {
           cancelFormLoadEvent();
           $timeout(function() {
             $scope.setDownloadUrl(form);
-            sendIframeMessage({name: 'form', data: form});
+            sendIframeForm(form);
           });
         });
 
@@ -101791,7 +102310,7 @@ module.exports = function() {
   };
 };
 
-},{}],317:[function(_dereq_,module,exports){
+},{}],314:[function(_dereq_,module,exports){
 "use strict";
 module.exports = ['$sce', '$parse', '$compile', function($sce, $parse, $compile) {
   return {
@@ -101808,7 +102327,7 @@ module.exports = ['$sce', '$parse', '$compile', function($sce, $parse, $compile)
   };
 }];
 
-},{}],318:[function(_dereq_,module,exports){
+},{}],315:[function(_dereq_,module,exports){
 "use strict";
 var _get = _dereq_('lodash/get');
 var moment = _dereq_('moment');
@@ -102183,7 +102702,7 @@ module.exports = [
   }
 ];
 
-},{"lodash/get":216,"moment":263}],319:[function(_dereq_,module,exports){
+},{"lodash/get":224,"moment":271}],316:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102199,7 +102718,7 @@ module.exports = function() {
   };
 };
 
-},{}],320:[function(_dereq_,module,exports){
+},{}],317:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'formioComponents',
@@ -102272,7 +102791,7 @@ module.exports = [
   }
 ];
 
-},{}],321:[function(_dereq_,module,exports){
+},{}],318:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102357,7 +102876,7 @@ module.exports = function() {
   };
 };
 
-},{}],322:[function(_dereq_,module,exports){
+},{}],319:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   '$compile',
@@ -102376,7 +102895,7 @@ module.exports = [
   }
 ];
 
-},{}],323:[function(_dereq_,module,exports){
+},{}],320:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102386,7 +102905,7 @@ module.exports = function() {
   };
 };
 
-},{}],324:[function(_dereq_,module,exports){
+},{}],321:[function(_dereq_,module,exports){
 "use strict";
 var maskInput = _dereq_('vanilla-text-mask').default;
 var createNumberMask = _dereq_('text-mask-addons').createNumberMask;
@@ -102571,7 +103090,7 @@ module.exports = ['FormioUtils', function(FormioUtils) {
   };
 }];
 
-},{"formiojs/utils":276,"lodash":242,"text-mask-addons":352,"vanilla-text-mask":355}],325:[function(_dereq_,module,exports){
+},{"formiojs/utils":35,"lodash":250,"text-mask-addons":349,"vanilla-text-mask":352}],322:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102598,7 +103117,7 @@ module.exports = function() {
     }
   };
 };
-},{}],326:[function(_dereq_,module,exports){
+},{}],323:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102626,7 +103145,7 @@ module.exports = function() {
   };
 };
 
-},{}],327:[function(_dereq_,module,exports){
+},{}],324:[function(_dereq_,module,exports){
 "use strict";
 var _map = _dereq_('lodash/map');
 // Javascript editor directive
@@ -102702,7 +103221,7 @@ module.exports = ['FormioUtils', function(FormioUtils) {
   };
 }];
 
-},{"lodash/map":243}],328:[function(_dereq_,module,exports){
+},{"lodash/map":251}],325:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102734,7 +103253,7 @@ module.exports = function() {
   };
 };
 
-},{}],329:[function(_dereq_,module,exports){
+},{}],326:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -102790,7 +103309,7 @@ module.exports = function() {
   };
 };
 
-},{}],330:[function(_dereq_,module,exports){
+},{}],327:[function(_dereq_,module,exports){
 "use strict";
 var isNaN = _dereq_('lodash/isNaN');
 var isFinite = _dereq_('lodash/isFinite');
@@ -103432,7 +103951,7 @@ module.exports = function() {
   };
 };
 
-},{"lodash/isEmpty":225,"lodash/isFinite":227,"lodash/isNaN":231}],331:[function(_dereq_,module,exports){
+},{"lodash/isEmpty":233,"lodash/isFinite":235,"lodash/isNaN":239}],328:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'Formio',
@@ -103629,7 +104148,7 @@ module.exports = [
   }
 ];
 
-},{}],332:[function(_dereq_,module,exports){
+},{}],329:[function(_dereq_,module,exports){
 "use strict";
 var formioUtils = _dereq_('formiojs/utils').default;
 var conformToMask = _dereq_('vanilla-text-mask').conformToMask;
@@ -103942,6 +104461,7 @@ module.exports = function() {
         return item !== '[]';
       })).conformedValue;
     },
+    fieldData: formioUtils.fieldData,
     parseFloat: formioUtils.parseFloat,
     formatAsCurrency: formioUtils.formatAsCurrency,
     checkCalculated: formioUtils.checkCalculated,
@@ -104120,7 +104640,7 @@ module.exports = function() {
   };
 };
 
-},{"formiojs/utils":276,"lodash/filter":214,"lodash/get":216,"vanilla-text-mask":355}],333:[function(_dereq_,module,exports){
+},{"formiojs/utils":35,"lodash/filter":222,"lodash/get":224,"vanilla-text-mask":352}],330:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   var generic = function(data, options) {
@@ -104247,7 +104767,7 @@ module.exports = function() {
   };
 };
 
-},{}],334:[function(_dereq_,module,exports){
+},{}],331:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   '$q',
@@ -104296,7 +104816,7 @@ module.exports = [
   }
 ];
 
-},{}],335:[function(_dereq_,module,exports){
+},{}],332:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'Formio',
@@ -104342,7 +104862,7 @@ module.exports = [
   }
 ];
 
-},{}],336:[function(_dereq_,module,exports){
+},{}],333:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'FormioUtils',
@@ -104351,7 +104871,7 @@ module.exports = [
   }
 ];
 
-},{}],337:[function(_dereq_,module,exports){
+},{}],334:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   '$sce',
@@ -104364,7 +104884,7 @@ module.exports = [
   }
 ];
 
-},{}],338:[function(_dereq_,module,exports){
+},{}],335:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
     return function(label, shortcut) {
@@ -104386,7 +104906,7 @@ module.exports = function() {
     };
   }
   
-},{}],339:[function(_dereq_,module,exports){
+},{}],336:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   function() {
@@ -104405,7 +104925,7 @@ module.exports = [
   }
 ];
 
-},{}],340:[function(_dereq_,module,exports){
+},{}],337:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'formioTableView',
@@ -104418,7 +104938,7 @@ module.exports = [
   }
 ];
 
-},{}],341:[function(_dereq_,module,exports){
+},{}],338:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'Formio',
@@ -104433,7 +104953,7 @@ module.exports = [
   }
 ];
 
-},{}],342:[function(_dereq_,module,exports){
+},{}],339:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   '$filter',
@@ -104490,7 +105010,7 @@ module.exports = [
   }
 ];
 
-},{}],343:[function(_dereq_,module,exports){
+},{}],340:[function(_dereq_,module,exports){
 "use strict";
 module.exports = ['$sce', function($sce) {
   return function(val) {
@@ -104498,7 +105018,7 @@ module.exports = ['$sce', function($sce) {
   };
 }];
 
-},{}],344:[function(_dereq_,module,exports){
+},{}],341:[function(_dereq_,module,exports){
 (function (global){
 "use strict";
 global.jQuery = _dereq_('jquery');
@@ -104517,7 +105037,7 @@ _dereq_('angular-ui-ace/src/ui-ace');
 _dereq_('./formio');
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./formio":345,"angular":10,"angular-ckeditor":268,"angular-file-saver":2,"angular-moment":3,"angular-sanitize":5,"angular-ui-ace/src/ui-ace":6,"angular-ui-bootstrap":8,"bootstrap":12,"bootstrap-ui-datetime-picker/dist/datetime-picker":11,"jquery":30,"ng-dialog":265,"ng-file-upload":267,"ui-select/dist/select":354}],345:[function(_dereq_,module,exports){
+},{"./formio":342,"angular":11,"angular-ckeditor":1,"angular-file-saver":3,"angular-moment":4,"angular-sanitize":6,"angular-ui-ace/src/ui-ace":7,"angular-ui-bootstrap":9,"bootstrap":13,"bootstrap-ui-datetime-picker/dist/datetime-picker":12,"jquery":38,"ng-dialog":273,"ng-file-upload":275,"ui-select/dist/select":351}],342:[function(_dereq_,module,exports){
 "use strict";
 _dereq_('./polyfills/polyfills');
 
@@ -104657,7 +105177,7 @@ app.run([
     );
 
     $templateCache.put('formio/submissions.html',
-      "<div>\n  <div ng-repeat=\"alert in formioAlerts track by $index\" class=\"alert alert-{{ alert.type }}\" role=\"alert\">\n    {{ alert.message | formioTranslate:null:options.building }}\n  </div>\n  <table class=\"table\">\n    <thead>\n      <tr>\n        <th ng-repeat=\"component in form.components | flattenComponents track by $index\" ng-if=\"tableView(component)\">{{ component.label || component.key }}</th>\n        <th>Submitted</th>\n        <th>Updated</th>\n        <th>Operations</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr ng-repeat=\"submission in submissions track by $index\" class=\"formio-submission\" ng-click=\"$emit('submissionView', submission)\">\n        <td ng-repeat=\"component in form.components | flattenComponents track by $index\" ng-if=\"tableView(component)\">{{ submission.data | tableView:component }}</td>\n        <td>{{ submission.created | amDateFormat:'l, h:mm:ss a' }}</td>\n        <td>{{ submission.modified | amDateFormat:'l, h:mm:ss a' }}</td>\n        <td>\n          <div class=\"button-group\" style=\"display:flex;\">\n            <a ng-click=\"$emit('submissionView', submission); $event.stopPropagation();\" class=\"btn btn-primary btn-xs\"><span class=\"glyphicon glyphicon-eye-open\"></span></a>&nbsp;\n            <a ng-click=\"$emit('submissionEdit', submission); $event.stopPropagation();\" class=\"btn btn-default btn-xs\"><span class=\"glyphicon glyphicon-edit\"></span></a>&nbsp;\n            <a ng-click=\"$emit('submissionDelete', submission); $event.stopPropagation();\" class=\"btn btn-danger btn-xs\"><span class=\"glyphicon glyphicon-remove-circle\"></span></a>\n          </div>\n        </td>\n      </tr>\n    </tbody>\n  </table>\n  <pagination\n    ng-if=\"submissions.serverCount > perPage\"\n    ng-model=\"currentPage\"\n    ng-change=\"pageChanged(currentPage)\"\n    total-items=\"submissions.serverCount\"\n    items-per-page=\"perPage\"\n    direction-links=\"false\"\n    boundary-links=\"true\"\n    first-text=\"&laquo;\"\n    last-text=\"&raquo;\"\n    >\n  </pagination>\n</div>\n"
+      "<div>\n  <div ng-repeat=\"alert in formioAlerts track by $index\" class=\"alert alert-{{ alert.type }}\" role=\"alert\">\n    {{ alert.message | formioTranslate:null:options.building }}\n  </div>\n  <table class=\"table\">\n    <thead>\n      <tr>\n        <th ng-repeat=\"component in form.components | flattenComponents track by $index\" ng-if=\"tableView(component)\">{{ component.label || component.key }}</th>\n        <th>Submitted</th>\n        <th>Updated</th>\n        <th>Operations</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr ng-repeat=\"submission in submissions track by $index\" class=\"formio-submission\" ng-click=\"$emit('submissionView', submission)\">\n        <td ng-repeat=\"component in form.components | flattenComponents track by $index\" ng-if=\"tableView(component)\">{{ submission.data | tableView:component }}</td>\n        <td>{{ submission.created | amDateFormat:'l, h:mm:ss a' }}</td>\n        <td>{{ submission.modified | amDateFormat:'l, h:mm:ss a' }}</td>\n        <td>\n          <div class=\"button-group\" style=\"display:flex;\">\n            <a ng-click=\"$emit('submissionView', submission); $event.stopPropagation();\" class=\"btn btn-primary btn-xs\"><span class=\"glyphicon glyphicon-eye-open\"></span></a>&nbsp;\n            <a ng-click=\"$emit('submissionEdit', submission); $event.stopPropagation();\" class=\"btn btn-default btn-xs\"><span class=\"glyphicon glyphicon-edit\"></span></a>&nbsp;\n            <a ng-click=\"$emit('submissionDelete', submission); $event.stopPropagation();\" class=\"btn btn-danger btn-xs\"><span class=\"glyphicon glyphicon-remove-circle\"></span></a>\n          </div>\n        </td>\n      </tr>\n    </tbody>\n  </table>\n  <pagination\n    ng-if=\"submissions.serverCount > perPage\"\n    ng-model=\"currentPage\"\n    ng-model-options=\"{allowInvalid: true}\"\n    ng-change=\"pageChanged(currentPage)\"\n    total-items=\"submissions.serverCount\"\n    items-per-page=\"perPage\"\n    direction-links=\"false\"\n    boundary-links=\"true\"\n    first-text=\"&laquo;\"\n    last-text=\"&raquo;\"\n  >\n  </pagination>\n</div>\n"
     );
 
     // A formio component template.
@@ -104681,7 +105201,7 @@ app.run([
 
 _dereq_('./components');
 
-},{"./components":298,"./directives/customValidator":315,"./directives/formio":316,"./directives/formioBindHtml.js":317,"./directives/formioComponent":318,"./directives/formioComponentTooltip":319,"./directives/formioComponentView":320,"./directives/formioDelete":321,"./directives/formioElement":322,"./directives/formioErrors":323,"./directives/formioMask":324,"./directives/formioMax":325,"./directives/formioMin":326,"./directives/formioScriptEditor":327,"./directives/formioSubmission":328,"./directives/formioSubmissions":329,"./directives/formioWizard":330,"./factories/FormioScope":331,"./factories/FormioUtils":332,"./factories/formioInterceptor":334,"./factories/formioTableView":335,"./filters/flattenComponents":336,"./filters/safehtml":337,"./filters/shortcut":338,"./filters/tableComponents":339,"./filters/tableFieldView":340,"./filters/tableView":341,"./filters/translate":342,"./filters/trusturl":343,"./polyfills/polyfills":347,"./providers/Formio":348}],346:[function(_dereq_,module,exports){
+},{"./components":295,"./directives/customValidator":312,"./directives/formio":313,"./directives/formioBindHtml.js":314,"./directives/formioComponent":315,"./directives/formioComponentTooltip":316,"./directives/formioComponentView":317,"./directives/formioDelete":318,"./directives/formioElement":319,"./directives/formioErrors":320,"./directives/formioMask":321,"./directives/formioMax":322,"./directives/formioMin":323,"./directives/formioScriptEditor":324,"./directives/formioSubmission":325,"./directives/formioSubmissions":326,"./directives/formioWizard":327,"./factories/FormioScope":328,"./factories/FormioUtils":329,"./factories/formioInterceptor":331,"./factories/formioTableView":332,"./filters/flattenComponents":333,"./filters/safehtml":334,"./filters/shortcut":335,"./filters/tableComponents":336,"./filters/tableFieldView":337,"./filters/tableView":338,"./filters/translate":339,"./filters/trusturl":340,"./polyfills/polyfills":344,"./providers/Formio":345}],343:[function(_dereq_,module,exports){
 "use strict";
 'use strict';
 
@@ -104712,13 +105232,13 @@ if (typeof Object.assign != 'function') {
   })();
 }
 
-},{}],347:[function(_dereq_,module,exports){
+},{}],344:[function(_dereq_,module,exports){
 "use strict";
 'use strict';
 
 _dereq_('./Object.assign');
 
-},{"./Object.assign":346}],348:[function(_dereq_,module,exports){
+},{"./Object.assign":343}],345:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   // The formio class.
@@ -104799,7 +105319,7 @@ module.exports = function() {
   };
 };
 
-},{"formiojs/Formio":269}],349:[function(_dereq_,module,exports){
+},{"formiojs/Formio":28}],346:[function(_dereq_,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -104985,7 +105505,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],350:[function(_dereq_,module,exports){
+},{}],347:[function(_dereq_,module,exports){
 module.exports = function (obj) {
     if (!obj || typeof obj !== 'object') return obj;
     
@@ -105022,7 +105542,7 @@ var isArray = Array.isArray || function (xs) {
     return {}.toString.call(xs) === '[object Array]';
 };
 
-},{}],351:[function(_dereq_,module,exports){
+},{}],348:[function(_dereq_,module,exports){
 /*!
  * Signature Pad v2.3.2
  * https://github.com/szimek/signature_pad
@@ -105634,9 +106154,9 @@ return SignaturePad;
 
 })));
 
-},{}],352:[function(_dereq_,module,exports){
+},{}],349:[function(_dereq_,module,exports){
 !function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t():"function"==typeof define&&define.amd?define([],t):"object"==typeof exports?exports.textMaskAddons=t():e.textMaskAddons=t()}(this,function(){return function(e){function t(r){if(n[r])return n[r].exports;var o=n[r]={exports:{},id:r,loaded:!1};return e[r].call(o.exports,o,o.exports,t),o.loaded=!0,o.exports}var n={};return t.m=e,t.c=n,t.p="",t(0)}([function(e,t,n){"use strict";function r(e){return e&&e.__esModule?e:{default:e}}Object.defineProperty(t,"__esModule",{value:!0});var o=n(1);Object.defineProperty(t,"createAutoCorrectedDatePipe",{enumerable:!0,get:function(){return r(o).default}});var i=n(2);Object.defineProperty(t,"createNumberMask",{enumerable:!0,get:function(){return r(i).default}});var u=n(3);Object.defineProperty(t,"emailMask",{enumerable:!0,get:function(){return r(u).default}})},function(e,t){"use strict";function n(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:"mm dd yyyy";return function(t){var n=[],r=e.split(/[^dmyHMS]+/),o={dd:31,mm:12,yy:99,yyyy:9999,HH:23,MM:59,SS:59},i={dd:1,mm:1,yy:0,yyyy:1,HH:0,MM:0,SS:0},u=t.split("");r.forEach(function(t){var r=e.indexOf(t),i=parseInt(o[t].toString().substr(0,1),10);parseInt(u[r],10)>i&&(u[r+1]=u[r],u[r]=0,n.push(r))});var c=r.some(function(n){var r=e.indexOf(n),u=n.length,c=t.substr(r,u).replace(/\D/g,""),l=parseInt(c,10);return l>o[n]||c.length===u&&l<i[n]});return!c&&{value:u.join(""),indexesOfPipedChars:n}}}Object.defineProperty(t,"__esModule",{value:!0}),t.default=n},function(e,t){"use strict";function n(){function e(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:c,t=e.length;if(e===c||e[0]===g[0]&&1===t)return g.split(c).concat([v]).concat(m.split(c));if(e===P&&_)return g.split(c).concat(["0",P,v]).concat(m.split(c));var n=e[0]===s&&H;n&&(e=e.toString().substr(1));var u=e.lastIndexOf(P),l=u!==-1,a=void 0,h=void 0,b=void 0;if(e.slice($*-1)===m&&(e=e.slice(0,$*-1)),l&&(_||D)?(a=e.slice(e.slice(0,N)===g?N:0,u),h=e.slice(u+1,t),h=r(h.replace(f,c))):a=e.slice(0,N)===g?e.slice(N):e,L&&("undefined"==typeof L?"undefined":i(L))===p){var O="."===M?"[.]":""+M,S=(a.match(new RegExp(O,"g"))||[]).length;a=a.slice(0,L+S*V)}return a=a.replace(f,c),R||(a=a.replace(/^0+(0$|[^0])/,"$1")),a=x?o(a,M):a,b=r(a),(l&&_||D===!0)&&(e[u-1]!==P&&b.push(y),b.push(P,y),h&&(("undefined"==typeof C?"undefined":i(C))===p&&(h=h.slice(0,C)),b=b.concat(h)),D===!0&&e[u-1]===P&&b.push(v)),N>0&&(b=g.split(c).concat(b)),n&&(b.length===N&&b.push(v),b=[d].concat(b)),m.length>0&&(b=b.concat(m.split(c))),b}var t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{},n=t.prefix,g=void 0===n?u:n,h=t.suffix,m=void 0===h?c:h,b=t.includeThousandsSeparator,x=void 0===b||b,O=t.thousandsSeparatorSymbol,M=void 0===O?l:O,S=t.allowDecimal,_=void 0!==S&&S,j=t.decimalSymbol,P=void 0===j?a:j,w=t.decimalLimit,C=void 0===w?2:w,k=t.requireDecimal,D=void 0!==k&&k,E=t.allowNegative,H=void 0!==E&&E,I=t.allowLeadingZeroes,R=void 0!==I&&I,A=t.integerLimit,L=void 0===A?null:A,N=g&&g.length||0,$=m&&m.length||0,V=M&&M.length||0;return e.instanceOf="createNumberMask",e}function r(e){return e.split(c).map(function(e){return v.test(e)?v:e})}function o(e,t){return e.replace(/\B(?=(\d{3})+(?!\d))/g,t)}Object.defineProperty(t,"__esModule",{value:!0});var i="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e};t.default=n;var u="$",c="",l=",",a=".",s="-",d=/-/,f=/\D+/g,p="number",v=/\d/,y="[]"},function(e,t,n){"use strict";function r(e){return e&&e.__esModule?e:{default:e}}function o(e,t){e=e.replace(O,v);var n=t.placeholderChar,r=t.currentCaretPosition,o=e.indexOf(y),s=e.lastIndexOf(p),d=s<o?-1:s,f=i(e,o+1,y),g=i(e,d-1,p),h=u(e,o,n),m=c(e,o,d,n),b=l(e,d,n,r);h=a(h),m=a(m),b=a(b,!0);var x=h.concat(f).concat(m).concat(g).concat(b);return x}function i(e,t,n){var r=[];return e[t]===n?r.push(n):r.push(g,n),r.push(g),r}function u(e,t){return t===-1?e:e.slice(0,t)}function c(e,t,n,r){var o=v;return t!==-1&&(o=n===-1?e.slice(t+1,e.length):e.slice(t+1,n)),o=o.replace(new RegExp("[\\s"+r+"]",m),v),o===y?f:o.length<1?h:o[o.length-1]===p?o.slice(0,o.length-1):o}function l(e,t,n,r){var o=v;return t!==-1&&(o=e.slice(t+1,e.length)),o=o.replace(new RegExp("[\\s"+n+".]",m),v),0===o.length?e[t-1]===p&&r!==e.length?f:v:o}function a(e,t){return e.split(v).map(function(e){return e===h?e:t?x:b})}Object.defineProperty(t,"__esModule",{value:!0});var s=n(4),d=r(s),f="*",p=".",v="",y="@",g="[]",h=" ",m="g",b=/[^\s]/,x=/[^.\s]/,O=/\s/g;t.default={mask:o,pipe:d.default}},function(e,t){"use strict";function n(e,t){var n=t.currentCaretPosition,i=t.rawValue,f=t.previousConformedValue,p=t.placeholderChar,v=e;v=r(v);var y=v.indexOf(c),g=null===i.match(new RegExp("[^@\\s."+p+"]"));if(g)return u;if(v.indexOf(a)!==-1||y!==-1&&n!==y+1||i.indexOf(o)===-1&&f!==u&&i.indexOf(l)!==-1)return!1;var h=v.indexOf(o),m=v.slice(h+1,v.length);return(m.match(d)||s).length>1&&v.substr(-1)===l&&n!==i.length&&(v=v.slice(0,v.length-1)),v}function r(e){var t=0;return e.replace(i,function(){return t++,1===t?o:u})}Object.defineProperty(t,"__esModule",{value:!0}),t.default=n;var o="@",i=/@/g,u="",c="@.",l=".",a="..",s=[],d=/\./g}])});
-},{}],353:[function(_dereq_,module,exports){
+},{}],350:[function(_dereq_,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = _dereq_('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -105715,7 +106235,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,_dereq_("timers").setImmediate,_dereq_("timers").clearImmediate)
-},{"process/browser.js":349,"timers":353}],354:[function(_dereq_,module,exports){
+},{"process/browser.js":346,"timers":350}],351:[function(_dereq_,module,exports){
 /*!
  * ui-select
  * http://github.com/angular-ui/ui-select
@@ -108143,9 +108663,9 @@ $templateCache.put("selectize/match.tpl.html","<div ng-hide=\"$select.searchEnab
 $templateCache.put("selectize/no-choice.tpl.html","<div class=\"ui-select-no-choice selectize-dropdown\" ng-show=\"$select.items.length == 0\"><div class=\"selectize-dropdown-content\"><div data-selectable=\"\" ng-transclude=\"\"></div></div></div>");
 $templateCache.put("selectize/select-multiple.tpl.html","<div class=\"ui-select-container selectize-control multi plugin-remove_button\" ng-class=\"{\'open\': $select.open}\"><div class=\"selectize-input\" ng-class=\"{\'focus\': $select.open, \'disabled\': $select.disabled, \'selectize-focus\' : $select.focus}\" ng-click=\"$select.open && !$select.searchEnabled ? $select.toggle($event) : $select.activate()\"><div class=\"ui-select-match\"></div><input type=\"search\" autocomplete=\"off\" tabindex=\"-1\" class=\"ui-select-search\" ng-class=\"{\'ui-select-search-hidden\':!$select.searchEnabled}\" placeholder=\"{{$selectMultiple.getPlaceholder()}}\" ng-model=\"$select.search\" ng-disabled=\"$select.disabled\" aria-expanded=\"{{$select.open}}\" aria-label=\"{{ $select.baseTitle }}\" ondrop=\"return false;\"></div><div class=\"ui-select-choices\"></div><div class=\"ui-select-no-choice\"></div></div>");
 $templateCache.put("selectize/select.tpl.html","<div class=\"ui-select-container selectize-control single\" ng-class=\"{\'open\': $select.open}\"><div class=\"selectize-input\" ng-class=\"{\'focus\': $select.open, \'disabled\': $select.disabled, \'selectize-focus\' : $select.focus}\" ng-click=\"$select.open && !$select.searchEnabled ? $select.toggle($event) : $select.activate()\"><div class=\"ui-select-match\"></div><input type=\"search\" autocomplete=\"off\" tabindex=\"-1\" class=\"ui-select-search ui-select-toggle\" ng-class=\"{\'ui-select-search-hidden\':!$select.searchEnabled}\" ng-click=\"$select.toggle($event)\" placeholder=\"{{$select.placeholder}}\" ng-model=\"$select.search\" ng-hide=\"!$select.isEmpty() && !$select.open\" ng-disabled=\"$select.disabled\" aria-label=\"{{ $select.baseTitle }}\"></div><div class=\"ui-select-choices\"></div><div class=\"ui-select-no-choice\"></div></div>");}]);
-},{}],355:[function(_dereq_,module,exports){
+},{}],352:[function(_dereq_,module,exports){
 !function(e,r){"object"==typeof exports&&"object"==typeof module?module.exports=r():"function"==typeof define&&define.amd?define([],r):"object"==typeof exports?exports.vanillaTextMask=r():e.vanillaTextMask=r()}(this,function(){return function(e){function r(n){if(t[n])return t[n].exports;var o=t[n]={exports:{},id:n,loaded:!1};return e[n].call(o.exports,o,o.exports,r),o.loaded=!0,o.exports}var t={};return r.m=e,r.c=t,r.p="",r(0)}([function(e,r,t){"use strict";function n(e){return e&&e.__esModule?e:{default:e}}function o(e){var r=e.inputElement,t=(0,u.default)(e),n=function(e){var r=e.target.value;return t.update(r)};return r.addEventListener("input",n),t.update(r.value),{textMaskInputElement:t,destroy:function(){r.removeEventListener("input",n)}}}Object.defineProperty(r,"__esModule",{value:!0}),r.conformToMask=void 0,r.maskInput=o;var i=t(2);Object.defineProperty(r,"conformToMask",{enumerable:!0,get:function(){return n(i).default}});var a=t(5),u=n(a);r.default=o},function(e,r){"use strict";Object.defineProperty(r,"__esModule",{value:!0}),r.placeholderChar="_",r.strFunction="function"},function(e,r,t){"use strict";function n(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:l,r=arguments.length>1&&void 0!==arguments[1]?arguments[1]:u,t=arguments.length>2&&void 0!==arguments[2]?arguments[2]:{};if(!(0,i.isArray)(r)){if(("undefined"==typeof r?"undefined":o(r))!==a.strFunction)throw new Error("Text-mask:conformToMask; The mask property must be an array.");r=r(e,t),r=(0,i.processCaretTraps)(r).maskWithoutCaretTraps}var n=t.guide,s=void 0===n||n,f=t.previousConformedValue,d=void 0===f?l:f,c=t.placeholderChar,p=void 0===c?a.placeholderChar:c,v=t.placeholder,h=void 0===v?(0,i.convertMaskToPlaceholder)(r,p):v,m=t.currentCaretPosition,y=t.keepCharPositions,g=s===!1&&void 0!==d,b=e.length,C=d.length,k=h.length,x=r.length,P=b-C,T=P>0,O=m+(T?-P:0),M=O+Math.abs(P);if(y===!0&&!T){for(var w=l,S=O;S<M;S++)h[S]===p&&(w+=p);e=e.slice(0,O)+w+e.slice(O,b)}for(var _=e.split(l).map(function(e,r){return{char:e,isNew:r>=O&&r<M}}),j=b-1;j>=0;j--){var V=_[j].char;if(V!==p){var A=j>=O&&C===x;V===h[A?j-P:j]&&_.splice(j,1)}}var E=l,N=!1;e:for(var F=0;F<k;F++){var I=h[F];if(I===p){if(_.length>0)for(;_.length>0;){var L=_.shift(),R=L.char,J=L.isNew;if(R===p&&g!==!0){E+=p;continue e}if(r[F].test(R)){if(y===!0&&J!==!1&&d!==l&&s!==!1&&T){for(var W=_.length,q=null,z=0;z<W;z++){var B=_[z];if(B.char!==p&&B.isNew===!1)break;if(B.char===p){q=z;break}}null!==q?(E+=R,_.splice(q,1)):F--}else E+=R;continue e}N=!0}g===!1&&(E+=h.substr(F,k));break}E+=I}if(g&&T===!1){for(var D=null,G=0;G<E.length;G++)h[G]===p&&(D=G);E=null!==D?E.substr(0,D+1):l}return{conformedValue:E,meta:{someCharsRejected:N}}}Object.defineProperty(r,"__esModule",{value:!0});var o="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e};r.default=n;var i=t(3),a=t(1),u=[],l=""},function(e,r,t){"use strict";function n(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:s,r=arguments.length>1&&void 0!==arguments[1]?arguments[1]:l.placeholderChar;if(!o(e))throw new Error("Text-mask:convertMaskToPlaceholder; The mask property must be an array.");if(e.indexOf(r)!==-1)throw new Error("Placeholder character must not be used as part of the mask. Please specify a character that is not present in your mask as your placeholder character.\n\n"+("The placeholder character that was received is: "+JSON.stringify(r)+"\n\n")+("The mask that was received is: "+JSON.stringify(e)));return e.map(function(e){return e instanceof RegExp?r:e}).join("")}function o(e){return Array.isArray&&Array.isArray(e)||e instanceof Array}function i(e){return"string"==typeof e||e instanceof String}function a(e){return"number"==typeof e&&void 0===e.length&&!isNaN(e)}function u(e){for(var r=[],t=void 0;t=e.indexOf(f),t!==-1;)r.push(t),e.splice(t,1);return{maskWithoutCaretTraps:e,indexes:r}}Object.defineProperty(r,"__esModule",{value:!0}),r.convertMaskToPlaceholder=n,r.isArray=o,r.isString=i,r.isNumber=a,r.processCaretTraps=u;var l=t(1),s=[],f="[]"},function(e,r){"use strict";function t(e){var r=e.previousConformedValue,t=void 0===r?o:r,i=e.previousPlaceholder,a=void 0===i?o:i,u=e.currentCaretPosition,l=void 0===u?0:u,s=e.conformedValue,f=e.rawValue,d=e.placeholderChar,c=e.placeholder,p=e.indexesOfPipedChars,v=void 0===p?n:p,h=e.caretTrapIndexes,m=void 0===h?n:h;if(0===l||!f.length)return 0;var y=f.length,g=t.length,b=c.length,C=s.length,k=y-g,x=k>0,P=0===g,T=k>1&&!x&&!P;if(T)return l;var O=x&&(t===s||s===c),M=0,w=void 0,S=void 0;if(O)M=l-k;else{var _=s.toLowerCase(),j=f.toLowerCase(),V=j.substr(0,l).split(o),A=V.filter(function(e){return _.indexOf(e)!==-1});S=A[A.length-1];var E=a.substr(0,A.length).split(o).filter(function(e){return e!==d}).length,N=c.substr(0,A.length).split(o).filter(function(e){return e!==d}).length,F=N!==E,I=void 0!==a[A.length-1]&&void 0!==c[A.length-2]&&a[A.length-1]!==d&&a[A.length-1]!==c[A.length-1]&&a[A.length-1]===c[A.length-2];!x&&(F||I)&&E>0&&c.indexOf(S)>-1&&void 0!==f[l]&&(w=!0,S=f[l]);for(var L=v.map(function(e){return _[e]}),R=L.filter(function(e){return e===S}).length,J=A.filter(function(e){return e===S}).length,W=c.substr(0,c.indexOf(d)).split(o).filter(function(e,r){return e===S&&f[r]!==e}).length,q=W+J+R+(w?1:0),z=0,B=0;B<C;B++){var D=_[B];if(M=B+1,D===S&&z++,z>=q)break}}if(x){for(var G=M,H=M;H<=b;H++)if(c[H]===d&&(G=H),c[H]===d||m.indexOf(H)!==-1||H===b)return G}else if(w){for(var K=M-1;K>=0;K--)if(s[K]===S||m.indexOf(K)!==-1||0===K)return K}else for(var Q=M;Q>=0;Q--)if(c[Q-1]===d||m.indexOf(Q)!==-1||0===Q)return Q}Object.defineProperty(r,"__esModule",{value:!0}),r.default=t;var n=[],o=""},function(e,r,t){"use strict";function n(e){return e&&e.__esModule?e:{default:e}}function o(e){var r={previousConformedValue:void 0,previousPlaceholder:void 0};return{state:r,update:function(t){var n=arguments.length>1&&void 0!==arguments[1]?arguments[1]:e,o=n.inputElement,s=n.mask,d=n.guide,m=n.pipe,g=n.placeholderChar,b=void 0===g?v.placeholderChar:g,C=n.keepCharPositions,k=void 0!==C&&C,x=n.showMask,P=void 0!==x&&x;if("undefined"==typeof t&&(t=o.value),t!==r.previousConformedValue){("undefined"==typeof s?"undefined":l(s))===y&&void 0!==s.pipe&&void 0!==s.mask&&(m=s.pipe,s=s.mask);var T=void 0,O=void 0;if(s instanceof Array&&(T=(0,p.convertMaskToPlaceholder)(s,b)),s!==!1){var M=a(t),w=o.selectionEnd,S=r.previousConformedValue,_=r.previousPlaceholder,j=void 0;if(("undefined"==typeof s?"undefined":l(s))===v.strFunction){if(O=s(M,{currentCaretPosition:w,previousConformedValue:S,placeholderChar:b}),O===!1)return;var V=(0,p.processCaretTraps)(O),A=V.maskWithoutCaretTraps,E=V.indexes;O=A,j=E,T=(0,p.convertMaskToPlaceholder)(O,b)}else O=s;var N={previousConformedValue:S,guide:d,placeholderChar:b,pipe:m,placeholder:T,currentCaretPosition:w,keepCharPositions:k},F=(0,c.default)(M,O,N),I=F.conformedValue,L=("undefined"==typeof m?"undefined":l(m))===v.strFunction,R={};L&&(R=m(I,u({rawValue:M},N)),R===!1?R={value:S,rejected:!0}:(0,p.isString)(R)&&(R={value:R}));var J=L?R.value:I,W=(0,f.default)({previousConformedValue:S,previousPlaceholder:_,conformedValue:J,placeholder:T,rawValue:M,currentCaretPosition:w,placeholderChar:b,indexesOfPipedChars:R.indexesOfPipedChars,caretTrapIndexes:j}),q=J===T&&0===W,z=P?T:h,B=q?z:J;r.previousConformedValue=B,r.previousPlaceholder=T,o.value!==B&&(o.value=B,i(o,W))}}}}}function i(e,r){document.activeElement===e&&(g?b(function(){return e.setSelectionRange(r,r,m)},0):e.setSelectionRange(r,r,m))}function a(e){if((0,p.isString)(e))return e;if((0,p.isNumber)(e))return String(e);if(void 0===e||null===e)return h;throw new Error("The 'value' provided to Text Mask needs to be a string or a number. The value received was:\n\n "+JSON.stringify(e))}Object.defineProperty(r,"__esModule",{value:!0});var u=Object.assign||function(e){for(var r=1;r<arguments.length;r++){var t=arguments[r];for(var n in t)Object.prototype.hasOwnProperty.call(t,n)&&(e[n]=t[n])}return e},l="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e};r.default=o;var s=t(4),f=n(s),d=t(2),c=n(d),p=t(3),v=t(1),h="",m="none",y="object",g="undefined"!=typeof navigator&&/Android/i.test(navigator.userAgent),b="undefined"!=typeof requestAnimationFrame?requestAnimationFrame:setTimeout}])});
-},{}],356:[function(_dereq_,module,exports){
+},{}],353:[function(_dereq_,module,exports){
 (function(self) {
   'use strict';
 
@@ -108613,7 +109133,7 @@ $templateCache.put("selectize/select.tpl.html","<div class=\"ui-select-container
   self.fetch.polyfill = true
 })(typeof self !== 'undefined' ? self : this);
 
-},{}],357:[function(_dereq_,module,exports){
+},{}],354:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -108693,7 +109213,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],358:[function(_dereq_,module,exports){
+},{}],355:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -108787,7 +109307,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],359:[function(_dereq_,module,exports){
+},{}],356:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -108912,7 +109432,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],360:[function(_dereq_,module,exports){
+},{}],357:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -108997,7 +109517,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],361:[function(_dereq_,module,exports){
+},{}],358:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.run([
@@ -109153,7 +109673,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],362:[function(_dereq_,module,exports){
+},{}],359:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109217,7 +109737,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],363:[function(_dereq_,module,exports){
+},{}],360:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109288,7 +109808,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],364:[function(_dereq_,module,exports){
+},{}],361:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109368,7 +109888,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],365:[function(_dereq_,module,exports){
+},{}],362:[function(_dereq_,module,exports){
 "use strict";
 var _assign = _dereq_('lodash/assign');
 
@@ -109434,7 +109954,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/assign":204}],366:[function(_dereq_,module,exports){
+},{"lodash/assign":212}],363:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109533,7 +110053,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],367:[function(_dereq_,module,exports){
+},{}],364:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109716,7 +110236,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],368:[function(_dereq_,module,exports){
+},{}],365:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109801,7 +110321,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],369:[function(_dereq_,module,exports){
+},{}],366:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -109910,7 +110430,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],370:[function(_dereq_,module,exports){
+},{}],367:[function(_dereq_,module,exports){
 "use strict";
 var _cloneDeep = _dereq_('lodash/cloneDeep');
 var _each = _dereq_('lodash/each');
@@ -109960,7 +110480,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/cloneDeep":208,"lodash/each":212}],371:[function(_dereq_,module,exports){
+},{"lodash/cloneDeep":216,"lodash/each":220}],368:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110023,7 +110543,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],372:[function(_dereq_,module,exports){
+},{}],369:[function(_dereq_,module,exports){
 "use strict";
 var _map = _dereq_('lodash/map');
 module.exports = function(app) {
@@ -110118,7 +110638,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/map":243}],373:[function(_dereq_,module,exports){
+},{"lodash/map":251}],370:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110244,7 +110764,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],374:[function(_dereq_,module,exports){
+},{}],371:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110305,7 +110825,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],375:[function(_dereq_,module,exports){
+},{}],372:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110367,7 +110887,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],376:[function(_dereq_,module,exports){
+},{}],373:[function(_dereq_,module,exports){
 "use strict";
 var app = angular.module('ngFormBuilder');
 
@@ -110412,7 +110932,7 @@ _dereq_('./panel')(app);
 _dereq_('./table')(app);
 _dereq_('./well')(app);
 
-},{"./address":357,"./button":358,"./checkbox":359,"./columns":360,"./components":361,"./container":362,"./content":363,"./currency":364,"./custom":365,"./datagrid":366,"./datetime":367,"./day":368,"./editgrid":369,"./email":370,"./fieldset":371,"./file":372,"./form":373,"./hidden":374,"./htmlelement":375,"./number":377,"./page":378,"./panel":379,"./password":380,"./phonenumber":381,"./radio":382,"./resource":383,"./select":384,"./selectboxes":385,"./signature":386,"./survey":387,"./table":388,"./textarea":389,"./textfield":390,"./time":391,"./well":392}],377:[function(_dereq_,module,exports){
+},{"./address":354,"./button":355,"./checkbox":356,"./columns":357,"./components":358,"./container":359,"./content":360,"./currency":361,"./custom":362,"./datagrid":363,"./datetime":364,"./day":365,"./editgrid":366,"./email":367,"./fieldset":368,"./file":369,"./form":370,"./hidden":371,"./htmlelement":372,"./number":374,"./page":375,"./panel":376,"./password":377,"./phonenumber":378,"./radio":379,"./resource":380,"./select":381,"./selectboxes":382,"./signature":383,"./survey":384,"./table":385,"./textarea":386,"./textfield":387,"./time":388,"./well":389}],374:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110548,7 +111068,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],378:[function(_dereq_,module,exports){
+},{}],375:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110569,7 +111089,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],379:[function(_dereq_,module,exports){
+},{}],376:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110684,7 +111204,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],380:[function(_dereq_,module,exports){
+},{}],377:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110760,7 +111280,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],381:[function(_dereq_,module,exports){
+},{}],378:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110843,7 +111363,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],382:[function(_dereq_,module,exports){
+},{}],379:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -110922,7 +111442,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],383:[function(_dereq_,module,exports){
+},{}],380:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111026,7 +111546,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],384:[function(_dereq_,module,exports){
+},{}],381:[function(_dereq_,module,exports){
 "use strict";
 var _clone = _dereq_('lodash/clone');
 module.exports = function(app) {
@@ -111287,7 +111807,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/clone":207}],385:[function(_dereq_,module,exports){
+},{"lodash/clone":215}],382:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111369,7 +111889,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],386:[function(_dereq_,module,exports){
+},{}],383:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111437,7 +111957,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],387:[function(_dereq_,module,exports){
+},{}],384:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111510,7 +112030,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],388:[function(_dereq_,module,exports){
+},{}],385:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111583,7 +112103,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],389:[function(_dereq_,module,exports){
+},{}],386:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111750,7 +112270,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],390:[function(_dereq_,module,exports){
+},{}],387:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111890,7 +112410,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],391:[function(_dereq_,module,exports){
+},{}],388:[function(_dereq_,module,exports){
 "use strict";
 var _cloneDeep = _dereq_('lodash/cloneDeep');
 var _each = _dereq_('lodash/each');
@@ -111943,7 +112463,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{"lodash/cloneDeep":208,"lodash/each":212}],392:[function(_dereq_,module,exports){
+},{"lodash/cloneDeep":216,"lodash/each":220}],389:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(app) {
   app.config([
@@ -111991,7 +112511,7 @@ module.exports = function(app) {
   ]);
 };
 
-},{}],393:[function(_dereq_,module,exports){
+},{}],390:[function(_dereq_,module,exports){
 "use strict";
 /**
   * These are component options that can be reused
@@ -112355,7 +112875,7 @@ module.exports = {
   }
 };
 
-},{}],394:[function(_dereq_,module,exports){
+},{}],391:[function(_dereq_,module,exports){
 "use strict";
 module.exports = {
   actions: [
@@ -112438,7 +112958,7 @@ module.exports = {
   ]
 };
 
-},{}],395:[function(_dereq_,module,exports){
+},{}],392:[function(_dereq_,module,exports){
 "use strict";
 /*eslint max-statements: 0*/
 var _cloneDeep = _dereq_('lodash/cloneDeep');
@@ -112853,7 +113373,7 @@ module.exports = ['debounce', function(debounce) {
   };
 }];
 
-},{"lodash/capitalize":206,"lodash/cloneDeep":208,"lodash/each":212,"lodash/groupBy":217,"lodash/merge":246,"lodash/omitBy":248,"lodash/upperFirst":260}],396:[function(_dereq_,module,exports){
+},{"lodash/capitalize":214,"lodash/cloneDeep":216,"lodash/each":220,"lodash/groupBy":225,"lodash/merge":254,"lodash/omitBy":256,"lodash/upperFirst":268}],393:[function(_dereq_,module,exports){
 "use strict";
 /**
  * Create the form-builder-component directive.
@@ -112869,7 +113389,7 @@ module.exports = [
   }
 ];
 
-},{}],397:[function(_dereq_,module,exports){
+},{}],394:[function(_dereq_,module,exports){
 "use strict";
 'use strict';
 var utils = _dereq_('formiojs/utils').default;
@@ -112965,7 +113485,7 @@ module.exports = [
   }
 ];
 
-},{"formiojs/utils":27,"lodash/get":216,"lodash/reject":252}],398:[function(_dereq_,module,exports){
+},{"formiojs/utils":35,"lodash/get":224,"lodash/reject":260}],395:[function(_dereq_,module,exports){
 "use strict";
 var _isNumber = _dereq_('lodash/isNumber');
 var _camelCase = _dereq_('lodash/camelCase');
@@ -113319,7 +113839,7 @@ module.exports = [
   }
 ];
 
-},{"lodash/assign":204,"lodash/camelCase":205,"lodash/isNumber":233}],399:[function(_dereq_,module,exports){
+},{"lodash/assign":212,"lodash/camelCase":213,"lodash/isNumber":241}],396:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   'formioElementDirective',
@@ -113344,7 +113864,7 @@ module.exports = [
   }
 ];
 
-},{}],400:[function(_dereq_,module,exports){
+},{}],397:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   function() {
@@ -113369,7 +113889,7 @@ module.exports = [
   }
 ];
 
-},{}],401:[function(_dereq_,module,exports){
+},{}],398:[function(_dereq_,module,exports){
 "use strict";
 /**
 * This directive creates a field for tweaking component options.
@@ -113460,7 +113980,7 @@ module.exports = ['COMMON_OPTIONS', '$filter', function(COMMON_OPTIONS, $filter)
   };
 }];
 
-},{}],402:[function(_dereq_,module,exports){
+},{}],399:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for editing a component's custom validation.
@@ -113501,7 +114021,7 @@ module.exports = function() {
   };
 };
 
-},{}],403:[function(_dereq_,module,exports){
+},{}],400:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component input format.
@@ -113545,7 +114065,7 @@ module.exports = function() {
   };
 };
 
-},{}],404:[function(_dereq_,module,exports){
+},{}],401:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component inputs' label position.
@@ -113587,7 +114107,7 @@ module.exports = function() {
     };
   };
 
-},{}],405:[function(_dereq_,module,exports){
+},{}],402:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component's key.
@@ -113633,7 +114153,7 @@ module.exports = function() {
   };
 };
 
-},{}],406:[function(_dereq_,module,exports){
+},{}],403:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component's label position.
@@ -113697,7 +114217,7 @@ module.exports = function() {
     };
   };
 
-},{}],407:[function(_dereq_,module,exports){
+},{}],404:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component options' label position.
@@ -113739,7 +114259,7 @@ module.exports = function() {
     };
   };
 
-},{}],408:[function(_dereq_,module,exports){
+},{}],405:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component's shortcut.
@@ -113761,7 +114281,7 @@ module.exports = function() {
   };
 };
 
-},{}],409:[function(_dereq_,module,exports){
+},{}],406:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for a field to edit a component's tags.
@@ -113805,7 +114325,7 @@ module.exports = function() {
   };
 };
 
-},{"lodash/map":243}],410:[function(_dereq_,module,exports){
+},{"lodash/map":251}],407:[function(_dereq_,module,exports){
 "use strict";
 module.exports = [
   function() {
@@ -113827,7 +114347,7 @@ module.exports = [
   }
 ];
 
-},{}],411:[function(_dereq_,module,exports){
+},{}],408:[function(_dereq_,module,exports){
 "use strict";
 /**
  * A directive for a table builder
@@ -113881,7 +114401,7 @@ module.exports = function() {
   };
 };
 
-},{"lodash/merge":246}],412:[function(_dereq_,module,exports){
+},{"lodash/merge":254}],409:[function(_dereq_,module,exports){
 "use strict";
 /**
 * Invokes Bootstrap's popover jquery plugin on an element
@@ -113926,7 +114446,7 @@ module.exports = ['$filter', function($filter) {
   };
 }];
 
-},{}],413:[function(_dereq_,module,exports){
+},{}],410:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive that provides a UI to add {value, label} objects to an array.
@@ -113989,7 +114509,7 @@ module.exports = function() {
   };
 };
 
-},{"lodash/camelCase":205,"lodash/map":243}],414:[function(_dereq_,module,exports){
+},{"lodash/camelCase":213,"lodash/map":251}],411:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function() {
   return {
@@ -114026,7 +114546,7 @@ module.exports = function() {
   };
 };
 
-},{}],415:[function(_dereq_,module,exports){
+},{}],412:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function () {
   return {
@@ -114049,7 +114569,7 @@ module.exports = function () {
   };
 }
 
-},{}],416:[function(_dereq_,module,exports){
+},{}],413:[function(_dereq_,module,exports){
 "use strict";
 /**
  * A directive that provides a UI for multiple masks input.
@@ -114090,7 +114610,7 @@ module.exports = ['COMMON_OPTIONS', function (COMMON_OPTIONS) {
   };
 }];
 
-},{}],417:[function(_dereq_,module,exports){
+},{}],414:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive that provides a UI to add key-value pair object.
@@ -114163,7 +114683,7 @@ module.exports = function() {
   };
 };
 
-},{}],418:[function(_dereq_,module,exports){
+},{}],415:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive for an input mask for default value.
@@ -114213,7 +114733,7 @@ module.exports = function() {
   };
 };
 
-},{"formiojs/utils":27,"vanilla-text-mask":355}],419:[function(_dereq_,module,exports){
+},{"formiojs/utils":35,"vanilla-text-mask":352}],416:[function(_dereq_,module,exports){
 "use strict";
 /*
 * Prevents user inputting invalid api key characters.
@@ -114236,7 +114756,7 @@ module.exports = function() {
   };
 };
 
-},{}],420:[function(_dereq_,module,exports){
+},{}],417:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive that provides a UI to add {value, label} objects to an array.
@@ -114318,7 +114838,7 @@ module.exports = function() {
   };
 };
 
-},{"lodash/camelCase":205,"lodash/map":243}],421:[function(_dereq_,module,exports){
+},{"lodash/camelCase":213,"lodash/map":251}],418:[function(_dereq_,module,exports){
 "use strict";
 /**
 * A directive that provides a UI to add {value, label} objects to an array.
@@ -114440,7 +114960,7 @@ module.exports = ['BuilderUtils', function(BuilderUtils) {
   }
 ];
 
-},{"lodash/camelCase":205,"lodash/difference":211,"lodash/map":243,"lodash/without":261}],422:[function(_dereq_,module,exports){
+},{"lodash/camelCase":213,"lodash/difference":219,"lodash/map":251,"lodash/without":269}],419:[function(_dereq_,module,exports){
 "use strict";
 'use strict';
 
@@ -114599,7 +115119,7 @@ module.exports = ['FormioUtils', function(FormioUtils) {
   };
 }];
 
-},{"lodash/difference":211,"lodash/range":251}],423:[function(_dereq_,module,exports){
+},{"lodash/difference":219,"lodash/range":259}],420:[function(_dereq_,module,exports){
 "use strict";
 // Create an AngularJS service called debounce
 module.exports = ['$timeout','$q', function($timeout, $q) {
@@ -114633,16 +115153,16 @@ module.exports = ['$timeout','$q', function($timeout, $q) {
   };
 }];
 
-},{}],424:[function(_dereq_,module,exports){
+},{}],421:[function(_dereq_,module,exports){
 "use strict";
 _dereq_('ng-formio/src/formio-full.js');
 _dereq_('angular-drag-and-drop-lists');
 _dereq_('ng-dialog');
 _dereq_('./ngFormBuilder.js');
 
-},{"./ngFormBuilder.js":425,"angular-drag-and-drop-lists":1,"ng-dialog":265,"ng-formio/src/formio-full.js":344}],425:[function(_dereq_,module,exports){
+},{"./ngFormBuilder.js":422,"angular-drag-and-drop-lists":2,"ng-dialog":273,"ng-formio/src/formio-full.js":341}],422:[function(_dereq_,module,exports){
 "use strict";
-/*! ng-formio-builder v2.34.0 | https://unpkg.com/ng-formio-builder@2.34.0/LICENSE.txt */
+/*! ng-formio-builder v2.35.3 | https://unpkg.com/ng-formio-builder@2.35.3/LICENSE.txt */
 /*global window: false, console: false, jQuery: false */
 /*jshint browser: true */
 
@@ -114826,5 +115346,5 @@ app.run([
 
 _dereq_('./components');
 
-},{"./components":376,"./constants/commonOptions":393,"./constants/formOptions":394,"./directives/formBuilder":395,"./directives/formBuilderComponent":396,"./directives/formBuilderConditional":397,"./directives/formBuilderDnd":398,"./directives/formBuilderElement":399,"./directives/formBuilderList":400,"./directives/formBuilderOption":401,"./directives/formBuilderOptionCustomValidation":402,"./directives/formBuilderOptionInputFormat":403,"./directives/formBuilderOptionInputsLabelPosition":404,"./directives/formBuilderOptionKey":405,"./directives/formBuilderOptionLabelPosition":406,"./directives/formBuilderOptionOptionsLabelPosition":407,"./directives/formBuilderOptionShortcut":408,"./directives/formBuilderOptionTags":409,"./directives/formBuilderRow":410,"./directives/formBuilderTable":411,"./directives/formBuilderTooltip":412,"./directives/headersBuilder":413,"./directives/jsonInput":414,"./directives/labelValidator":415,"./directives/multiMaskInput":416,"./directives/objectBuilder":417,"./directives/textMask":418,"./directives/validApiKey":419,"./directives/valueBuilder":420,"./directives/valueBuilderWithShortcuts":421,"./factories/BuilderUtils":422,"./factories/debounce":423}]},{},[424])(424)
+},{"./components":373,"./constants/commonOptions":390,"./constants/formOptions":391,"./directives/formBuilder":392,"./directives/formBuilderComponent":393,"./directives/formBuilderConditional":394,"./directives/formBuilderDnd":395,"./directives/formBuilderElement":396,"./directives/formBuilderList":397,"./directives/formBuilderOption":398,"./directives/formBuilderOptionCustomValidation":399,"./directives/formBuilderOptionInputFormat":400,"./directives/formBuilderOptionInputsLabelPosition":401,"./directives/formBuilderOptionKey":402,"./directives/formBuilderOptionLabelPosition":403,"./directives/formBuilderOptionOptionsLabelPosition":404,"./directives/formBuilderOptionShortcut":405,"./directives/formBuilderOptionTags":406,"./directives/formBuilderRow":407,"./directives/formBuilderTable":408,"./directives/formBuilderTooltip":409,"./directives/headersBuilder":410,"./directives/jsonInput":411,"./directives/labelValidator":412,"./directives/multiMaskInput":413,"./directives/objectBuilder":414,"./directives/textMask":415,"./directives/validApiKey":416,"./directives/valueBuilder":417,"./directives/valueBuilderWithShortcuts":418,"./factories/BuilderUtils":419,"./factories/debounce":420}]},{},[421])(421)
 });

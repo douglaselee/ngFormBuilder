@@ -95,6 +95,7 @@ exports.matchInputMask = matchInputMask;
 exports.getNumberSeparators = getNumberSeparators;
 exports.getNumberDecimalLimit = getNumberDecimalLimit;
 exports.getCurrencyAffixes = getCurrencyAffixes;
+exports.fieldData = fieldData;
 
 var _lodash = _dereq_('lodash');
 
@@ -493,7 +494,7 @@ function checkCalculated(component, submission, rowData) {
   // Process calculated value stuff if present.
   if (component.calculateValue) {
     _lodash2.default.set(rowData, component.key, evaluate(component.calculateValue, {
-      value: [],
+      value: undefined,
       data: submission ? submission.data : rowData,
       row: rowData,
       util: this,
@@ -548,7 +549,7 @@ function checkCustomConditional(component, custom, row, data, form, variable, on
   if (typeof custom === 'string') {
     custom = 'var ' + variable + ' = true; ' + custom + '; return ' + variable + ';';
   }
-  var value = evaluate(custom, { component: component, row: row, data: data, form: form, instance: instance });
+  var value = instance && instance.evaluate ? instance.evaluate(custom, { row: row, data: data, form: form }) : evaluate(custom, { row: row, data: data, form: form });
   if (value === null) {
     return onError;
   }
@@ -587,7 +588,7 @@ function checkCondition(component, row, data, form, instance) {
   } else if (component.conditional && component.conditional.when) {
     return checkSimpleConditional(component, component.conditional, row, data, true);
   } else if (component.conditional && component.conditional.json) {
-    return checkJsonConditional(component, component.conditional.json, row, data, form);
+    return checkJsonConditional(component, component.conditional.json, row, data, form, instance);
   }
 
   // Default to show.
@@ -616,7 +617,7 @@ function checkTrigger(component, trigger, row, data, form, instance) {
   return false;
 }
 
-function setActionProperty(component, action, row, data, result) {
+function setActionProperty(component, action, row, data, result, instance) {
   switch (action.property.type) {
     case 'boolean':
       if (_lodash2.default.get(component, action.property.value, false).toString() !== action.state.toString()) {
@@ -625,12 +626,13 @@ function setActionProperty(component, action, row, data, result) {
       break;
     case 'string':
       {
-        var newValue = interpolate(action.text, {
+        var evalData = {
           data: data,
           row: row,
           component: component,
           result: result
-        });
+        };
+        var newValue = instance && instance.interpolate ? instance.interpolate(action.text, evalData) : interpolate(action.text, evalData);
         if (newValue !== _lodash2.default.get(component, action.property.value, '')) {
           _lodash2.default.set(component, action.property.value, newValue);
         }
@@ -725,15 +727,32 @@ function getDateSetting(date) {
     return null;
   }
 
-  var dateSetting = (0, _moment2.default)(date);
-  if (dateSetting.isValid()) {
+  if (date instanceof Date) {
+    return date;
+  } else if (typeof date.toDate === 'function') {
+    return date.isValid() ? date.toDate() : null;
+  }
+
+  var dateSetting = typeof date !== 'string' || date.indexOf('moment(') === -1 ? (0, _moment2.default)(date) : null;
+  if (dateSetting && dateSetting.isValid()) {
     return dateSetting.toDate();
   }
 
+  dateSetting = null;
   try {
     var value = new Function('moment', 'return ' + date + ';')(_moment2.default);
-    dateSetting = (0, _moment2.default)(value);
+    if (typeof value === 'string') {
+      dateSetting = (0, _moment2.default)(value);
+    } else if (typeof value.toDate === 'function') {
+      dateSetting = (0, _moment2.default)(value.toDate().toUTCString());
+    } else if (value instanceof Date) {
+      dateSetting = (0, _moment2.default)(value);
+    }
   } catch (e) {
+    return null;
+  }
+
+  if (!dateSetting) {
     return null;
   }
 
@@ -902,6 +921,55 @@ function getCurrencyAffixes(_ref) {
     prefix: parts[1] || '',
     suffix: parts[2] || ''
   };
+}
+
+/**
+ * Fetch the field data provided a component.
+ *
+ * @param data
+ * @param component
+ * @return {*}
+ */
+function fieldData(data, component) {
+  if (!data) {
+    return '';
+  }
+  if (!component || !component.key) {
+    return data;
+  }
+  if (component.key.indexOf('.') !== -1) {
+    var value = data;
+    var parts = component.key.split('.');
+    var key = '';
+    for (var i = 0; i < parts.length; i++) {
+      key = parts[i];
+
+      // Handle nested resources
+      if (value.hasOwnProperty('_id')) {
+        value = value.data;
+      }
+
+      // Return if the key is not found on the value.
+      if (!value.hasOwnProperty(key)) {
+        return;
+      }
+
+      // Convert old single field data in submissions to multiple
+      if (key === parts[parts.length - 1] && component.multiple && !Array.isArray(value[key])) {
+        value[key] = [value[key]];
+      }
+
+      // Set the value of this key.
+      value = value[key];
+    }
+    return value;
+  } else {
+    // Convert old single field data in submissions to multiple
+    if (component.multiple && !Array.isArray(data[component.key])) {
+      data[component.key] = [data[component.key]];
+    }
+    return data[component.key];
+  }
 }
 },{"./jsonlogic/operators":2,"json-logic-js":4,"lodash":209,"moment":228}],4:[function(_dereq_,module,exports){
 /* globals define,module */
@@ -26694,9 +26762,9 @@ module.exports = words;
 
             mom = createUTC([2000, 1]).day(i);
             if (strict && !this._fullWeekdaysParse[i]) {
-                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\.?') + '$', 'i');
-                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\.?') + '$', 'i');
-                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\.?') + '$', 'i');
+                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\\.?') + '$', 'i');
+                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\\.?') + '$', 'i');
+                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\\.?') + '$', 'i');
             }
             if (!this._weekdaysParse[i]) {
                 regex = '^' + this.weekdays(mom, '') + '|^' + this.weekdaysShort(mom, '') + '|^' + this.weekdaysMin(mom, '');
@@ -27499,7 +27567,7 @@ module.exports = words;
 
     function preprocessRFC2822(s) {
         // Remove comments and folding whitespace and replace multiple-spaces with a single space
-        return s.replace(/\([^)]*\)|[\n\t]/g, ' ').replace(/(\s\s+)/g, ' ').trim();
+        return s.replace(/\([^)]*\)|[\n\t]/g, ' ').replace(/(\s\s+)/g, ' ').replace(/^\s\s*/, '').replace(/\s\s*$/, '');
     }
 
     function checkWeekday(weekdayStr, parsedInput, config) {
@@ -29678,7 +29746,7 @@ module.exports = words;
     // Side effect imports
 
 
-    hooks.version = '2.22.1';
+    hooks.version = '2.22.2';
 
     setHookCallback(createLocal);
 
@@ -35751,7 +35819,7 @@ module.exports = ['$timeout','$q', function($timeout, $q) {
 
 },{}],297:[function(_dereq_,module,exports){
 "use strict";
-/*! ng-formio-builder v2.34.0 | https://unpkg.com/ng-formio-builder@2.34.0/LICENSE.txt */
+/*! ng-formio-builder v2.35.3 | https://unpkg.com/ng-formio-builder@2.35.3/LICENSE.txt */
 /*global window: false, console: false, jQuery: false */
 /*jshint browser: true */
 
