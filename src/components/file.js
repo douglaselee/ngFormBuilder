@@ -20,7 +20,7 @@ module.exports = function(app) {
 
             // Suggest useful choices
             $scope.component.storage = $scope.component.storage || 'url';
-            $scope.component.url     = $scope.component.url     || Formio.getBaseUrl() + '/api/files';
+            $scope.component.url     = $scope.component.url     || '/api/files';
           }
         ],
         icon: 'fa fa-file',
