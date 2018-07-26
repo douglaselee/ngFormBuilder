@@ -2,6 +2,7 @@
 /*global window: false, console: false, jQuery: false */
 /*jshint browser: true */
 var fs = require('fs');
+var utils = require('formiojs/utils').default;
 
 var app = angular.module('ngFormBuilder', [
   'formio',
@@ -27,10 +28,8 @@ app.directive('formBuilderDraggable', function() {
     link: function(scope, element) {
       var el = element[0];
       el.draggable = true;
-      var dropZone = document.getElementById('fb-drop-zone');
-      if (!dropZone) {
-        return console.warn('No drop-zone detected.');
-      }
+      var formBuilder = null;
+      var dropZone = null;
 
       // Drag over event handler.
       var dragOver = function(event) {
@@ -42,8 +41,7 @@ app.directive('formBuilderDraggable', function() {
 
       // Drag end event handler.
       var dragEnd = function() {
-        dropZone.style.zIndex = 0;
-        dropZone.style.display = 'none';
+        jQuery(dropZone).removeClass('enabled');
         dropZone.removeEventListener('dragover', dragOver, false);
         dropZone.removeEventListener('drop', dragDrop, false);
       };
@@ -65,9 +63,26 @@ app.directive('formBuilderDraggable', function() {
         return false;
       };
 
-      el.addEventListener('dragstart', function() {
-        dropZone.style.zIndex = 10;
-        dropZone.style.display = 'inherit';
+      el.addEventListener('dragstart', function(event) {
+        event.stopPropagation();
+        event.dataTransfer.setData('text/plain', 'true');
+        if (!dropZone) {
+          dropZone = document.getElementById('fb-drop-zone');
+        }
+        if (!dropZone) {
+          return console.warn('Cannot find fb-drop-zone');
+        }
+        if (!formBuilder) {
+          formBuilder = document.getElementById('fb-pdf-builder');
+        }
+        if (!formBuilder) {
+          return console.warn('Cannot find fb-pdf-builder');
+        }
+
+        var builderRect = utils.getElementRect(formBuilder);
+        dropZone.style.width = builderRect && builderRect.width ? builderRect.width + 'px' : '100%';
+        dropZone.style.height = builderRect && builderRect.height ? builderRect.height + 'px' : '1000px';
+        jQuery(dropZone).addClass('enabled');
         dropZone.addEventListener('dragover', dragOver, false);
         dropZone.addEventListener('drop', dragDrop, false);
         return false;

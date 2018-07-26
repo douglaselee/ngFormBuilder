@@ -102741,6 +102741,32 @@ module.exports = ['debounce', function(debounce) {
           });
         }
 
+        $scope.$on('iframe-componentUpdate', function(event, data) {
+          FormioUtils.eachComponent($scope.form.components, function(component) {
+            if (data.id && component.id) {
+              if (component.id === data.id) {
+                component.overlay = data.overlay;
+              }
+            }
+            else if (component.key === data.key) {
+              component.overlay = data.overlay;
+            }
+          });
+        });
+
+        $scope.$on('iframe-componentClick', function(event, data) {
+          FormioUtils.eachComponent($scope.form.components, function(component) {
+            if (data.id && component.id) {
+              if (component.id === data.id) {
+                $scope.$broadcast('editComponent', component);
+              }
+            }
+            else if (component.key === data.key) {
+              $scope.$broadcast('editComponent', component);
+            }
+          });
+        });
+
         // Ensure we always have a page set.
         $scope.$watch('form.page', function(page) {
           if (page === undefined) {
@@ -102944,11 +102970,15 @@ module.exports = ['debounce', function(debounce) {
         $scope.$on('formBuilder:add', update);
         $scope.$on('formBuilder:update', update);
         $scope.$on('formBuilder:remove', update);
-        $scope.$on('formBuilder:edit', update);
+        $scope.$on('formBuilder:edit', function() {
+          $scope.$broadcast('iframeMessage', {name: 'form', data: angular.copy($scope.form)});
+          update();
+        });
 
         $scope.saveSettings = function() {
           ngDialog.closeAll(true);
-          $scope.$emit('formUpdate', $scope.form);
+          $scope.$broadcast('iframeMessage', {name: 'form', data: angular.copy($scope.form)});
+          update();
         };
 
         $scope.capitalize = _capitalize;
@@ -103203,6 +103233,11 @@ module.exports = [
     $scope.formComponents = formioComponents.components;
     if (!$scope.component) {
       $scope.component = $scope.form;
+      $scope.$watch('form', function(newForm) {
+        if ($scope.component.type === 'form') {
+          $scope.component = newForm;
+        }
+      });
     }
 
     // Components depend on this existing
@@ -103216,19 +103251,8 @@ module.exports = [
       $scope.$emit.apply($scope, args);
     };
 
-    $scope.$on('iframe-componentClick', function(event, data) {
-      FormioUtils.eachComponent($scope.component.components, function(component) {
-        if (component.id === data.id) {
-          $scope.editComponent(component);
-        }
-      });
-    });
-    $scope.$on('iframe-componentUpdate', function(event, data) {
-      FormioUtils.eachComponent($scope.component.components, function(component) {
-        if (component.id === data.id) {
-          component.overlay = data.overlay;
-        }
-      });
+    $scope.$on('editComponent', function(event, component) {
+      $scope.editComponent(component);
     });
 
     $scope.$on('fbDragDrop', function(event, component) {
@@ -103395,7 +103419,8 @@ module.exports = [
       }
 
       // Open the dialog.
-      var originalKey = '';
+      $scope.updateKey(component);
+      var originalKey = component.key;
       ngDialog.open({
         template: 'formio/components/settings.html',
         scope: childScope,
@@ -103426,9 +103451,6 @@ module.exports = [
           // Watch the settings label and auto set the key from it.
           $scope.$watch('component.label', function() {
             $scope.updateKey($scope.component);
-            if (!originalKey) {
-              originalKey = $scope.component.key;
-            }
           });
         }]
       }).closePromise.then(function(e) {
@@ -103447,7 +103469,6 @@ module.exports = [
         // Don't calculate for components that don't have a label.
         if (!component.label && ['panel', 'content', 'fieldset', 'table', 'well'].indexOf(component.type) === -1) {
           component.key = originalKey;
-          $scope.updateKey(component);
           component.label = component.key || component.type;
           component.hideLabel = true;
         }
@@ -103455,7 +103476,7 @@ module.exports = [
         FormioUtils.eachComponent([component], function(child) {
           delete child.isNew;
         }, true);
-        $scope.$broadcast('iframeMessage', {name: 'updateElement', data: component});
+
         $scope.emit('edit', component);
       });
     };
@@ -104840,10 +104861,11 @@ _dereq_('./ngFormBuilder.js');
 
 },{"./ngFormBuilder.js":424,"angular-drag-and-drop-lists":2,"ng-dialog":265,"ng-formio/src/formio-complete.js":343}],424:[function(_dereq_,module,exports){
 "use strict";
-/*! ng-formio-builder v2.35.4 | https://unpkg.com/ng-formio-builder@2.35.4/LICENSE.txt */
+/*! ng-formio-builder v2.35.11 | https://unpkg.com/ng-formio-builder@2.35.11/LICENSE.txt */
 /*global window: false, console: false, jQuery: false */
 /*jshint browser: true */
 
+var utils = _dereq_('formiojs/utils').default;
 
 var app = angular.module('ngFormBuilder', [
   'formio',
@@ -104869,10 +104891,8 @@ app.directive('formBuilderDraggable', function() {
     link: function(scope, element) {
       var el = element[0];
       el.draggable = true;
-      var dropZone = document.getElementById('fb-drop-zone');
-      if (!dropZone) {
-        return console.warn('No drop-zone detected.');
-      }
+      var formBuilder = null;
+      var dropZone = null;
 
       // Drag over event handler.
       var dragOver = function(event) {
@@ -104884,8 +104904,7 @@ app.directive('formBuilderDraggable', function() {
 
       // Drag end event handler.
       var dragEnd = function() {
-        dropZone.style.zIndex = 0;
-        dropZone.style.display = 'none';
+        jQuery(dropZone).removeClass('enabled');
         dropZone.removeEventListener('dragover', dragOver, false);
         dropZone.removeEventListener('drop', dragDrop, false);
       };
@@ -104907,9 +104926,26 @@ app.directive('formBuilderDraggable', function() {
         return false;
       };
 
-      el.addEventListener('dragstart', function() {
-        dropZone.style.zIndex = 10;
-        dropZone.style.display = 'inherit';
+      el.addEventListener('dragstart', function(event) {
+        event.stopPropagation();
+        event.dataTransfer.setData('text/plain', 'true');
+        if (!dropZone) {
+          dropZone = document.getElementById('fb-drop-zone');
+        }
+        if (!dropZone) {
+          return console.warn('Cannot find fb-drop-zone');
+        }
+        if (!formBuilder) {
+          formBuilder = document.getElementById('fb-pdf-builder');
+        }
+        if (!formBuilder) {
+          return console.warn('Cannot find fb-pdf-builder');
+        }
+
+        var builderRect = utils.getElementRect(formBuilder);
+        dropZone.style.width = builderRect && builderRect.width ? builderRect.width + 'px' : '100%';
+        dropZone.style.height = builderRect && builderRect.height ? builderRect.height + 'px' : '1000px';
+        jQuery(dropZone).addClass('enabled');
         dropZone.addEventListener('dragover', dragOver, false);
         dropZone.addEventListener('drop', dragDrop, false);
         return false;
@@ -105019,7 +105055,7 @@ app.run([
     );
 
     $templateCache.put('formio/formbuilder/builder.html',
-      "<div class=\"row formbuilder\">\n  <div class=\"col-xs-4 col-sm-3 col-md-2 formcomponents\" ng-if=\"form && form.display\">\n    <uib-accordion close-others=\"true\" ng-if=\"form.display !== 'pdf'\">\n      <div uib-accordion-group ng-repeat=\"(groupName, group) in formComponentGroups\" heading=\"{{ group.title | formioTranslate }}\" is-open=\"$first\" class=\"panel panel-default form-builder-panel {{ group.panelClass }}\">\n        <uib-accordion close-others=\"true\" ng-if=\"group.subgroups\">\n          <div uib-accordion-group ng-repeat=\"(subgroupName, subgroup) in group.subgroups\" heading=\"{{ subgroup.title | formioTranslate }}\" is-open=\"$first\" class=\"panel panel-default form-builder-panel subgroup-accordion\">\n            <div ng-repeat=\"component in formComponentsByGroup[groupName][subgroupName]\" ng-if=\"component.title\"\n                dnd-draggable=\"component.settings\"\n                dnd-dragstart=\"dndDragIframeWorkaround.isDragging = true\"\n                dnd-dragend=\"dndDragIframeWorkaround.isDragging = false\"\n                dnd-effect-allowed=\"copy\"\n                class=\"formcomponentcontainer\">\n              <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ component.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\">\n                <i ng-if=\"component.icon\" class=\"{{ component.icon }}\"></i> {{ component.title | formioTranslate }}\n              </span>\n            </div>\n          </div>\n        </uib-accordion>\n        <div ng-repeat=\"component in formComponentsByGroup[groupName]\" ng-if=\"!group.subgroup && component.title\"\n            dnd-draggable=\"component.settings\"\n            dnd-dragstart=\"dndDragIframeWorkaround.isDragging = true\"\n            dnd-dragend=\"dndDragIframeWorkaround.isDragging = false\"\n            dnd-effect-allowed=\"copy\"\n            class=\"formcomponentcontainer\">\n          <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ component.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\">\n            <i ng-if=\"component.icon\" class=\"{{ component.icon }}\"></i> {{ component.title | formioTranslate }}\n          </span>\n        </div>\n      </div>\n    </uib-accordion>\n    <uib-accordion close-others=\"true\" ng-if=\"form.display === 'pdf'\">\n      <div uib-accordion-group heading=\"{{ 'PDF Fields' | formioTranslate }}\" is-open=\"true\" class=\"panel panel-default form-builder-panel\">\n        <div class=\"formcomponentcontainer\" ng-repeat=\"pdftype in pdftypes\">\n          <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ pdftype.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\" form-builder-draggable=\"pdftype\">\n            <i ng-if=\"pdftype.icon\" class=\"{{ pdftype.icon }}\"></i> {{ pdftype.title | formioTranslate }}\n          </span>\n        </div>\n      </div>\n    </uib-accordion>\n  </div>\n  <div class=\"col-xs-8 col-sm-9 col-md-10 formarea\" ng-if=\"form && form.display\">\n    <ol class=\"breadcrumb\" ng-if=\"form.display === 'wizard'\">\n      <li ng-repeat=\"title in pages() track by $index\"><a class=\"label\" style=\"font-size:1em;\" ng-class=\"{'label-info': ($index === getPage()), 'label-primary': ($index !== getPage())}\" ng-click=\"showPage($index)\">{{ title }}</a></li>\n      <li><a class=\"label label-success\" style=\"font-size:1em;\" ng-click=\"newPage()\" data-toggle=\"tooltip\" title=\"Create Page\"><span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> page</a></li>\n    </ol>\n    <div class=\"dropzone\">\n      <div ng-if=\"form.display === 'pdf'\" ng-controller=\"formBuilderDnd\">\n        <div style=\"width:100%;height:1000px;position:absolute;display:none;\" id=\"fb-drop-zone\"></div>\n        <formio form=\"form\" options=\"{building: true}\"></formio>\n      </div>\n      <form-builder-list\n        ng-if=\"form.display !== 'pdf'\"\n        component=\"form\"\n        form=\"form\"\n        formio=\"::formio\"\n        hide-dnd-box-count=\"hideCount\"\n        root-list=\"true\"\n        class=\"rootlist\"\n        options=\"options\"\n        dnd-disable-if=\"form.display === 'wizard'\"\n      ></form-builder-list>\n    </div>\n  </div>\n</div>\n"
+      "<div class=\"row formbuilder\">\n  <div class=\"col-xs-4 col-sm-3 col-md-2 formcomponents\" ng-if=\"form && form.display\">\n    <uib-accordion close-others=\"true\" ng-if=\"form.display !== 'pdf'\">\n      <div uib-accordion-group ng-repeat=\"(groupName, group) in formComponentGroups\" heading=\"{{ group.title | formioTranslate }}\" is-open=\"$first\" class=\"panel panel-default form-builder-panel {{ group.panelClass }}\">\n        <uib-accordion close-others=\"true\" ng-if=\"group.subgroups\">\n          <div uib-accordion-group ng-repeat=\"(subgroupName, subgroup) in group.subgroups\" heading=\"{{ subgroup.title | formioTranslate }}\" is-open=\"$first\" class=\"panel panel-default form-builder-panel subgroup-accordion\">\n            <div ng-repeat=\"component in formComponentsByGroup[groupName][subgroupName]\" ng-if=\"component.title\"\n                dnd-draggable=\"component.settings\"\n                dnd-dragstart=\"dndDragIframeWorkaround.isDragging = true\"\n                dnd-dragend=\"dndDragIframeWorkaround.isDragging = false\"\n                dnd-effect-allowed=\"copy\"\n                class=\"formcomponentcontainer\">\n              <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ component.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\">\n                <i ng-if=\"component.icon\" class=\"{{ component.icon }}\"></i> {{ component.title | formioTranslate }}\n              </span>\n            </div>\n          </div>\n        </uib-accordion>\n        <div ng-repeat=\"component in formComponentsByGroup[groupName]\" ng-if=\"!group.subgroup && component.title\"\n            dnd-draggable=\"component.settings\"\n            dnd-dragstart=\"dndDragIframeWorkaround.isDragging = true\"\n            dnd-dragend=\"dndDragIframeWorkaround.isDragging = false\"\n            dnd-effect-allowed=\"copy\"\n            class=\"formcomponentcontainer\">\n          <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ component.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\">\n            <i ng-if=\"component.icon\" class=\"{{ component.icon }}\"></i> {{ component.title | formioTranslate }}\n          </span>\n        </div>\n      </div>\n    </uib-accordion>\n    <uib-accordion close-others=\"true\" ng-if=\"form.display === 'pdf'\">\n      <div uib-accordion-group heading=\"{{ 'PDF Fields' | formioTranslate }}\" is-open=\"true\" class=\"panel panel-default form-builder-panel\">\n        <div class=\"formcomponentcontainer\" ng-repeat=\"pdftype in pdftypes\">\n          <span class=\"btn btn-primary btn-xs btn-block formcomponent\" title=\"{{ pdftype.title | formioTranslate }}\" style=\"overflow: hidden; text-overflow: ellipsis;\" form-builder-draggable=\"pdftype\">\n            <i ng-if=\"pdftype.icon\" class=\"{{ pdftype.icon }}\"></i> {{ pdftype.title | formioTranslate }}\n          </span>\n        </div>\n      </div>\n    </uib-accordion>\n  </div>\n  <div class=\"col-xs-8 col-sm-9 col-md-10 formarea\" ng-if=\"form && form.display\">\n    <ol class=\"breadcrumb\" ng-if=\"form.display === 'wizard'\">\n      <li ng-repeat=\"title in pages() track by $index\"><a class=\"label\" style=\"font-size:1em;\" ng-class=\"{'label-info': ($index === getPage()), 'label-primary': ($index !== getPage())}\" ng-click=\"showPage($index)\">{{ title }}</a></li>\n      <li><a class=\"label label-success\" style=\"font-size:1em;\" ng-click=\"newPage()\" data-toggle=\"tooltip\" title=\"Create Page\"><span class=\"glyphicon glyphicon-plus\" aria-hidden=\"true\"></span> page</a></li>\n    </ol>\n    <div class=\"dropzone\">\n      <div ng-if=\"form.display === 'pdf'\" ng-controller=\"formBuilderDnd\" style=\"position:relative\">\n        <div class=\"formio-drop-zone\" id=\"fb-drop-zone\"></div>\n        <formio form=\"form\" options=\"{building: true}\" id=\"fb-pdf-builder\"></formio>\n      </div>\n      <form-builder-list\n        ng-if=\"form.display !== 'pdf'\"\n        component=\"form\"\n        form=\"form\"\n        formio=\"::formio\"\n        hide-dnd-box-count=\"hideCount\"\n        root-list=\"true\"\n        class=\"rootlist\"\n        options=\"options\"\n        dnd-disable-if=\"form.display === 'wizard'\"\n      ></form-builder-list>\n    </div>\n  </div>\n</div>\n"
     );
 
     $templateCache.put('formio/formbuilder/datagrid.html',
@@ -105034,5 +105070,5 @@ app.run([
 
 _dereq_('./components');
 
-},{"./components":375,"./constants/commonOptions":392,"./constants/formOptions":393,"./directives/formBuilder":394,"./directives/formBuilderComponent":395,"./directives/formBuilderConditional":396,"./directives/formBuilderDnd":397,"./directives/formBuilderElement":398,"./directives/formBuilderList":399,"./directives/formBuilderOption":400,"./directives/formBuilderOptionCustomValidation":401,"./directives/formBuilderOptionInputFormat":402,"./directives/formBuilderOptionInputsLabelPosition":403,"./directives/formBuilderOptionKey":404,"./directives/formBuilderOptionLabelPosition":405,"./directives/formBuilderOptionOptionsLabelPosition":406,"./directives/formBuilderOptionShortcut":407,"./directives/formBuilderOptionTags":408,"./directives/formBuilderRow":409,"./directives/formBuilderTable":410,"./directives/formBuilderTooltip":411,"./directives/headersBuilder":412,"./directives/jsonInput":413,"./directives/labelValidator":414,"./directives/multiMaskInput":415,"./directives/objectBuilder":416,"./directives/textMask":417,"./directives/validApiKey":418,"./directives/valueBuilder":419,"./directives/valueBuilderWithShortcuts":420,"./factories/BuilderUtils":421,"./factories/debounce":422}]},{},[423])(423)
+},{"./components":375,"./constants/commonOptions":392,"./constants/formOptions":393,"./directives/formBuilder":394,"./directives/formBuilderComponent":395,"./directives/formBuilderConditional":396,"./directives/formBuilderDnd":397,"./directives/formBuilderElement":398,"./directives/formBuilderList":399,"./directives/formBuilderOption":400,"./directives/formBuilderOptionCustomValidation":401,"./directives/formBuilderOptionInputFormat":402,"./directives/formBuilderOptionInputsLabelPosition":403,"./directives/formBuilderOptionKey":404,"./directives/formBuilderOptionLabelPosition":405,"./directives/formBuilderOptionOptionsLabelPosition":406,"./directives/formBuilderOptionShortcut":407,"./directives/formBuilderOptionTags":408,"./directives/formBuilderRow":409,"./directives/formBuilderTable":410,"./directives/formBuilderTooltip":411,"./directives/headersBuilder":412,"./directives/jsonInput":413,"./directives/labelValidator":414,"./directives/multiMaskInput":415,"./directives/objectBuilder":416,"./directives/textMask":417,"./directives/validApiKey":418,"./directives/valueBuilder":419,"./directives/valueBuilderWithShortcuts":420,"./factories/BuilderUtils":421,"./factories/debounce":422,"formiojs/utils":28}]},{},[423])(423)
 });

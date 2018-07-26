@@ -102,6 +102,32 @@ module.exports = ['debounce', function(debounce) {
           });
         }
 
+        $scope.$on('iframe-componentUpdate', function(event, data) {
+          FormioUtils.eachComponent($scope.form.components, function(component) {
+            if (data.id && component.id) {
+              if (component.id === data.id) {
+                component.overlay = data.overlay;
+              }
+            }
+            else if (component.key === data.key) {
+              component.overlay = data.overlay;
+            }
+          });
+        });
+
+        $scope.$on('iframe-componentClick', function(event, data) {
+          FormioUtils.eachComponent($scope.form.components, function(component) {
+            if (data.id && component.id) {
+              if (component.id === data.id) {
+                $scope.$broadcast('editComponent', component);
+              }
+            }
+            else if (component.key === data.key) {
+              $scope.$broadcast('editComponent', component);
+            }
+          });
+        });
+
         // Ensure we always have a page set.
         $scope.$watch('form.page', function(page) {
           if (page === undefined) {
@@ -308,11 +334,15 @@ module.exports = ['debounce', function(debounce) {
         $scope.$on('formBuilder:add', update);
         $scope.$on('formBuilder:update', update);
         $scope.$on('formBuilder:remove', update);
-        $scope.$on('formBuilder:edit', update);
+        $scope.$on('formBuilder:edit', function() {
+          $scope.$broadcast('iframeMessage', {name: 'form', data: angular.copy($scope.form)});
+          update();
+        });
 
         $scope.saveSettings = function() {
           ngDialog.closeAll(true);
-          $scope.$emit('formUpdate', $scope.form);
+          $scope.$broadcast('iframeMessage', {name: 'form', data: angular.copy($scope.form)});
+          update();
         };
 
         $scope.capitalize = _capitalize;
