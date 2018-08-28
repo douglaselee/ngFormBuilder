@@ -116,6 +116,11 @@ module.exports = {
     type: 'checkbox',
     tooltip: 'When a field is hidden, clear the value.'
   },
+  zoom: {
+    label: 'Use Zoom Dialog',
+    type: 'checkbox',
+    tooltip: 'Pop up zoom dialog when signature is clicked on or tabbed to.'
+  },
   unique: {
     label: 'Unique',
     type: 'checkbox',
