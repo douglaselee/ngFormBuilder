@@ -193,7 +193,7 @@ module.exports = {
   },
   nxUrl: {
     label: 'PaperStream NX Manager API Url',
-    placeholder: 'https://192.168.13.190:30447/api/v1/scanners/',
+    placeholder: 'https://WIN-523JV6C35O8:30447',
     tooltip: 'Enter the Url for the PaperStream NX Manager API'
   },
   filePattern: {
